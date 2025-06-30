@@ -1,0 +1,189 @@
+2025-07-01 01:56:04,368 - __main__ - INFO - 启动政策匹配RAG检索系统
+2025-07-01 01:56:04,368 - __main__ - INFO - 正在初始化政策匹配系统...
+2025-07-01 01:56:04,988 - policy_matcher - ERROR - 获取系统状态失败: No module named 'elasticsearch'
+2025-07-01 01:56:04,988 - __main__ - INFO - 系统状态: {'status': '异常', 'error': "No module named 'elasticsearch'"}
+2025-07-01 01:56:04,988 - __main__ - INFO - 发现政策文档: 北京市产业政策导引.pdf，开始加载...
+2025-07-01 01:56:04,988 - policy_matcher - INFO - 开始添加政策文档: 北京市产业政策导引.pdf
+2025-07-01 01:56:05,146 - jieba - DEBUG - Building prefix dict from the default dictionary ...
+2025-07-01 01:56:05,147 - jieba - DEBUG - Loading model from cache /var/folders/w7/v83dx60s0wnf6qh99wjhckhc0000gn/T/jieba.cache
+2025-07-01 01:56:05,500 - jieba - DEBUG - Loading model cost 0.354 seconds.
+2025-07-01 01:56:05,500 - jieba - DEBUG - Prefix dict has been built successfully.
+2025-07-01 01:56:05,501 - document_processor - INFO - 开始处理文档: 北京市产业政策导引.pdf
+2025-07-01 01:56:16,087 - document_processor - INFO - 文档处理完成: 北京市产业政策导引.pdf, 生成 910 个分块
+2025-07-01 01:56:18,930 - embeddings - INFO - 正在加载嵌入模型: moka-ai/m3e-base
+2025-07-01 01:56:18,930 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: moka-ai/m3e-base
+2025-07-01 01:56:23,698 - embeddings - INFO - 模型加载完成，使用设备: cpu
+2025-07-01 01:56:23,699 - embeddings - INFO - 开始编码 910 个文本
+2025-07-01 01:57:48,474 - embeddings - INFO - 编码完成，输出形状: (910, 768)
+2025-07-01 01:58:01,327 - vector_store - ERROR - 连接Milvus失败: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+2025-07-01 01:58:01,327 - vector_store - ERROR - 连接Elasticsearch失败: Elasticsearch.__init__() got an unexpected keyword argument 'timeout'
+2025-07-01 01:58:01,328 - policy_matcher - ERROR - 政策文档存储失败: 北京市产业政策导引.pdf
+2025-07-01 01:58:01,337 - __main__ - WARNING - 政策文档加载失败
+2025-07-01 01:58:01,337 - __main__ - INFO - 系统初始化完成
+2025-07-01 01:58:01,338 - __main__ - INFO - 开始测试查询...
+2025-07-01 01:58:01,338 - __main__ - INFO - 
+=== 测试查询 1: 生物医药行业政策查询 ===
+2025-07-01 01:58:01,338 - __main__ - INFO - 查询: 我想查找和生物医药相关的政策
+2025-07-01 01:58:01,338 - policy_matcher - INFO - 开始政策匹配: 我想查找和生物医药相关的政策
+2025-07-01 01:58:01,346 - retriever - INFO - 开始混合检索: 我想查找和生物医药相关的政策
+2025-07-01 01:58:01,346 - retriever - INFO - 查询扩展: 我想查找和生物医药相关的政策 -> ['医药', '我想查找和生物医药相关的政策', '制药', '医疗', '医药健康', '医疗器械', '生命科学']
+2025-07-01 01:58:01,346 - retriever - INFO - 构建过滤条件: {}
+2025-07-01 01:58:01,407 - retriever - INFO - 向量搜索返回 0 个结果
+2025-07-01 01:58:01,407 - retriever - INFO - 关键词搜索返回 0 个结果
+2025-07-01 01:58:01,407 - retriever - INFO - 融合结果: 0 个结果
+2025-07-01 01:58:01,407 - retriever - INFO - 检索完成，返回 0 个结果
+2025-07-01 01:58:01,408 - policy_matcher - INFO - 政策匹配完成，耗时: 0.07秒，返回: 0个结果
+2025-07-01 01:58:01,408 - __main__ - INFO - 查询结果: 找到 0 个匹配政策
+2025-07-01 01:58:01,408 - __main__ - INFO - 处理时间: 0.07秒
+2025-07-01 01:58:01,408 - __main__ - INFO - 建议:
+2025-07-01 01:58:01,408 - __main__ - INFO -   - 未找到匹配的政策，建议：
+2025-07-01 01:58:01,408 - __main__ - INFO -   - 1. 调整查询关键词，使用更通用的表述
+2025-07-01 01:58:01,408 - __main__ - INFO -   - 2. 尝试按行业或政策类型分类查询
+2025-07-01 01:58:01,408 - __main__ - INFO - 
+=== 测试查询 2: 初创企业政策查询 ===
+2025-07-01 01:58:01,408 - __main__ - INFO - 查询: 我是一家小型初创企业，现阶段有什么政策比较适用
+2025-07-01 01:58:01,408 - policy_matcher - INFO - 开始政策匹配: 我是一家小型初创企业，现阶段有什么政策比较适用
+2025-07-01 01:58:01,408 - retriever - INFO - 开始混合检索: 我是一家小型初创企业，现阶段有什么政策比较适用
+2025-07-01 01:58:01,408 - retriever - INFO - 查询扩展: 我是一家小型初创企业，现阶段有什么政策比较适用 -> ['创业', '新成立', '小企业', '我是一家小型初创企业 现阶段有什么政策比较适用', '小微', '起步']
+2025-07-01 01:58:01,408 - retriever - INFO - 构建过滤条件: {}
+2025-07-01 01:58:01,451 - retriever - INFO - 向量搜索返回 0 个结果
+2025-07-01 01:58:01,451 - retriever - INFO - 关键词搜索返回 0 个结果
+2025-07-01 01:58:01,451 - retriever - INFO - 融合结果: 0 个结果
+2025-07-01 01:58:01,451 - retriever - INFO - 企业规模过滤: 0 -> 0
+2025-07-01 01:58:01,451 - retriever - INFO - 检索完成，返回 0 个结果
+2025-07-01 01:58:01,451 - policy_matcher - INFO - 政策匹配完成，耗时: 0.04秒，返回: 0个结果
+2025-07-01 01:58:01,451 - __main__ - INFO - 查询结果: 找到 0 个匹配政策
+2025-07-01 01:58:01,451 - __main__ - INFO - 处理时间: 0.04秒
+2025-07-01 01:58:01,451 - __main__ - INFO - 建议:
+2025-07-01 01:58:01,451 - __main__ - INFO -   - 未找到匹配的政策，建议：
+2025-07-01 01:58:01,451 - __main__ - INFO -   - 1. 调整查询关键词，使用更通用的表述
+2025-07-01 01:58:01,451 - __main__ - INFO -   - 2. 尝试按行业或政策类型分类查询
+2025-07-01 01:58:01,451 - __main__ - INFO - 
+=== 测试查询 3: 创新资金政策查询 ===
+2025-07-01 01:58:01,451 - __main__ - INFO - 查询: 有哪些研发创新方面的资金支持政策
+2025-07-01 01:58:01,451 - policy_matcher - INFO - 开始政策匹配: 有哪些研发创新方面的资金支持政策
+2025-07-01 01:58:01,451 - retriever - INFO - 开始混合检索: 有哪些研发创新方面的资金支持政策
+2025-07-01 01:58:01,451 - retriever - INFO - 查询扩展: 有哪些研发创新方面的资金支持政策 -> ['奖励', '资助', '专项资金', '研发', '有哪些研发创新方面的资金支持政策', '专利', '技术', '科技', '补贴']
+2025-07-01 01:58:01,452 - retriever - INFO - 构建过滤条件: {}
+2025-07-01 01:58:01,493 - retriever - INFO - 向量搜索返回 0 个结果
+2025-07-01 01:58:01,493 - retriever - INFO - 关键词搜索返回 0 个结果
+2025-07-01 01:58:01,493 - retriever - INFO - 融合结果: 0 个结果
+2025-07-01 01:58:01,493 - retriever - INFO - 检索完成，返回 0 个结果
+2025-07-01 01:58:01,493 - policy_matcher - INFO - 政策匹配完成，耗时: 0.04秒，返回: 0个结果
+2025-07-01 01:58:01,493 - __main__ - INFO - 查询结果: 找到 0 个匹配政策
+2025-07-01 01:58:01,493 - __main__ - INFO - 处理时间: 0.04秒
+2025-07-01 01:58:01,493 - __main__ - INFO - 建议:
+2025-07-01 01:58:01,493 - __main__ - INFO -   - 未找到匹配的政策，建议：
+2025-07-01 01:58:01,494 - __main__ - INFO -   - 1. 调整查询关键词，使用更通用的表述
+2025-07-01 01:58:01,494 - __main__ - INFO -   - 2. 尝试按行业或政策类型分类查询
+2025-07-01 01:58:01,494 - __main__ - INFO - 启动API服务...
+2025-07-01 01:58:51,575 - api - INFO - 收到查询请求: 生物医药相关政策
+2025-07-01 01:58:51,576 - policy_matcher - INFO - 开始政策匹配: 生物医药相关政策
+2025-07-01 01:58:51,576 - retriever - INFO - 开始混合检索: 生物医药相关政策
+2025-07-01 01:58:51,576 - retriever - INFO - 查询扩展: 生物医药相关政策 -> ['医药', '制药', '医疗', '医药健康', '生物医药相关政策', '医疗器械', '生命科学']
+2025-07-01 01:58:51,576 - retriever - INFO - 构建过滤条件: {'industries': ['生物医药'], 'enterprise_scales': ['初创企业']}
+2025-07-01 01:58:51,645 - retriever - INFO - 向量搜索返回 0 个结果
+2025-07-01 01:58:51,646 - retriever - INFO - 关键词搜索返回 0 个结果
+2025-07-01 01:58:51,646 - retriever - INFO - 融合结果: 0 个结果
+2025-07-01 01:58:51,646 - retriever - INFO - 检索完成，返回 0 个结果
+2025-07-01 01:58:51,646 - policy_matcher - INFO - 政策匹配完成，耗时: 0.07秒，返回: 0个结果
+2025-07-01 01:58:51,646 - api - INFO - 查询完成，返回 0 个结果
+2025-07-01 02:00:07,851 - __main__ - INFO - 启动政策匹配RAG检索系统
+2025-07-01 02:00:07,851 - __main__ - INFO - 正在初始化政策匹配系统...
+2025-07-01 02:00:15,233 - __main__ - INFO - 用户中断，正在关闭系统...
+2025-07-01 02:13:53,963 - __main__ - INFO - 启动政策匹配RAG检索系统
+2025-07-01 02:13:53,963 - __main__ - INFO - 正在初始化政策匹配系统...
+2025-07-01 02:14:05,227 - vector_store - ERROR - 连接Milvus失败: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+2025-07-01 02:14:05,228 - vector_store - ERROR - 连接Elasticsearch失败: Elasticsearch.__init__() got an unexpected keyword argument 'timeout'
+2025-07-01 02:14:07,467 - embeddings - INFO - 正在加载嵌入模型: moka-ai/m3e-base
+2025-07-01 02:14:07,467 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: moka-ai/m3e-base
+2025-07-01 02:14:12,811 - embeddings - INFO - 模型加载完成，使用设备: cpu
+2025-07-01 02:14:12,812 - __main__ - INFO - 系统状态: {'status': '运行中', 'vector_store': {'milvus_connected': False, 'elasticsearch_connected': False, 'milvus_stats': {}, 'elasticsearch_stats': {}}, 'embedding_model': {'status': 'loaded', 'model_name': 'moka-ai/m3e-base', 'device': 'cpu', 'embedding_dim': 768, 'max_seq_length': 512}, 'components': {'document_processor': '正常', 'retriever': '正常', 'matcher': '正常'}}
+2025-07-01 02:14:12,812 - __main__ - INFO - 发现政策文档: 北京市产业政策导引.pdf，开始加载...
+2025-07-01 02:14:12,812 - policy_matcher - INFO - 开始添加政策文档: 北京市产业政策导引.pdf
+2025-07-01 02:14:13,078 - jieba - DEBUG - Building prefix dict from the default dictionary ...
+2025-07-01 02:14:13,079 - jieba - DEBUG - Loading model from cache /var/folders/w7/v83dx60s0wnf6qh99wjhckhc0000gn/T/jieba.cache
+2025-07-01 02:14:13,345 - jieba - DEBUG - Loading model cost 0.267 seconds.
+2025-07-01 02:14:13,345 - jieba - DEBUG - Prefix dict has been built successfully.
+2025-07-01 02:14:13,346 - document_processor - INFO - 开始处理文档: 北京市产业政策导引.pdf
+2025-07-01 02:14:24,865 - document_processor - INFO - 文档处理完成: 北京市产业政策导引.pdf, 生成 910 个分块
+2025-07-01 02:14:24,868 - embeddings - INFO - 开始编码 910 个文本
+2025-07-01 02:15:55,057 - embeddings - INFO - 编码完成，输出形状: (910, 768)
+2025-07-01 02:15:55,059 - policy_matcher - ERROR - 政策文档存储失败: 北京市产业政策导引.pdf
+2025-07-01 02:15:55,060 - __main__ - WARNING - 政策文档加载失败
+2025-07-01 02:15:55,060 - __main__ - INFO - 系统初始化完成
+2025-07-01 02:15:55,062 - __main__ - INFO - 开始测试查询...
+2025-07-01 02:15:55,062 - __main__ - INFO - 
+=== 测试查询 1: 生物医药行业政策查询 ===
+2025-07-01 02:15:55,062 - __main__ - INFO - 查询: 我想查找和生物医药相关的政策
+2025-07-01 02:15:55,065 - policy_matcher - INFO - 开始政策匹配: 我想查找和生物医药相关的政策
+2025-07-01 02:15:55,067 - retriever - INFO - 开始混合检索: 我想查找和生物医药相关的政策
+2025-07-01 02:15:55,068 - retriever - INFO - 查询扩展: 我想查找和生物医药相关的政策 -> ['制药', '医药健康', '医药', '生命科学', '医疗', '医疗器械', '我想查找和生物医药相关的政策']
+2025-07-01 02:15:55,068 - retriever - INFO - 构建过滤条件: {}
+2025-07-01 02:15:55,110 - retriever - INFO - 向量搜索返回 0 个结果
+2025-07-01 02:15:55,110 - retriever - INFO - 关键词搜索返回 0 个结果
+2025-07-01 02:15:55,110 - retriever - INFO - 融合结果: 0 个结果
+2025-07-01 02:15:55,110 - retriever - INFO - 检索完成，返回 0 个结果
+2025-07-01 02:15:55,110 - policy_matcher - INFO - 政策匹配完成，耗时: 0.05秒，返回: 0个结果
+2025-07-01 02:15:55,110 - __main__ - INFO - 查询结果: 找到 0 个匹配政策
+2025-07-01 02:15:55,110 - __main__ - INFO - 处理时间: 0.05秒
+2025-07-01 02:15:55,111 - __main__ - INFO - 建议:
+2025-07-01 02:15:55,111 - __main__ - INFO -   - 未找到匹配的政策，建议：
+2025-07-01 02:15:55,111 - __main__ - INFO -   - 1. 调整查询关键词，使用更通用的表述
+2025-07-01 02:15:55,111 - __main__ - INFO -   - 2. 尝试按行业或政策类型分类查询
+2025-07-01 02:15:55,111 - __main__ - INFO - 
+=== 测试查询 2: 初创企业政策查询 ===
+2025-07-01 02:15:55,111 - __main__ - INFO - 查询: 我是一家小型初创企业，现阶段有什么政策比较适用
+2025-07-01 02:15:55,111 - policy_matcher - INFO - 开始政策匹配: 我是一家小型初创企业，现阶段有什么政策比较适用
+2025-07-01 02:15:55,111 - retriever - INFO - 开始混合检索: 我是一家小型初创企业，现阶段有什么政策比较适用
+2025-07-01 02:15:55,111 - retriever - INFO - 查询扩展: 我是一家小型初创企业，现阶段有什么政策比较适用 -> ['小企业', '我是一家小型初创企业 现阶段有什么政策比较适用', '起步', '小微', '新成立', '创业']
+2025-07-01 02:15:55,111 - retriever - INFO - 构建过滤条件: {}
+2025-07-01 02:15:55,146 - retriever - INFO - 向量搜索返回 0 个结果
+2025-07-01 02:15:55,146 - retriever - INFO - 关键词搜索返回 0 个结果
+2025-07-01 02:15:55,146 - retriever - INFO - 融合结果: 0 个结果
+2025-07-01 02:15:55,146 - retriever - INFO - 企业规模过滤: 0 -> 0
+2025-07-01 02:15:55,146 - retriever - INFO - 检索完成，返回 0 个结果
+2025-07-01 02:15:55,146 - policy_matcher - INFO - 政策匹配完成，耗时: 0.04秒，返回: 0个结果
+2025-07-01 02:15:55,146 - __main__ - INFO - 查询结果: 找到 0 个匹配政策
+2025-07-01 02:15:55,146 - __main__ - INFO - 处理时间: 0.04秒
+2025-07-01 02:15:55,146 - __main__ - INFO - 建议:
+2025-07-01 02:15:55,146 - __main__ - INFO -   - 未找到匹配的政策，建议：
+2025-07-01 02:15:55,146 - __main__ - INFO -   - 1. 调整查询关键词，使用更通用的表述
+2025-07-01 02:15:55,146 - __main__ - INFO -   - 2. 尝试按行业或政策类型分类查询
+2025-07-01 02:15:55,146 - __main__ - INFO - 
+=== 测试查询 3: 创新资金政策查询 ===
+2025-07-01 02:15:55,146 - __main__ - INFO - 查询: 有哪些研发创新方面的资金支持政策
+2025-07-01 02:15:55,146 - policy_matcher - INFO - 开始政策匹配: 有哪些研发创新方面的资金支持政策
+2025-07-01 02:15:55,146 - retriever - INFO - 开始混合检索: 有哪些研发创新方面的资金支持政策
+2025-07-01 02:15:55,146 - retriever - INFO - 查询扩展: 有哪些研发创新方面的资金支持政策 -> ['奖励', '资助', '有哪些研发创新方面的资金支持政策', '研发', '技术', '专利', '专项资金', '补贴', '科技']
+2025-07-01 02:15:55,146 - retriever - INFO - 构建过滤条件: {}
+2025-07-01 02:15:55,184 - retriever - INFO - 向量搜索返回 0 个结果
+2025-07-01 02:15:55,185 - retriever - INFO - 关键词搜索返回 0 个结果
+2025-07-01 02:15:55,185 - retriever - INFO - 融合结果: 0 个结果
+2025-07-01 02:15:55,185 - retriever - INFO - 检索完成，返回 0 个结果
+2025-07-01 02:15:55,185 - policy_matcher - INFO - 政策匹配完成，耗时: 0.04秒，返回: 0个结果
+2025-07-01 02:15:55,185 - __main__ - INFO - 查询结果: 找到 0 个匹配政策
+2025-07-01 02:15:55,185 - __main__ - INFO - 处理时间: 0.04秒
+2025-07-01 02:15:55,185 - __main__ - INFO - 建议:
+2025-07-01 02:15:55,185 - __main__ - INFO -   - 未找到匹配的政策，建议：
+2025-07-01 02:15:55,185 - __main__ - INFO -   - 1. 调整查询关键词，使用更通用的表述
+2025-07-01 02:15:55,185 - __main__ - INFO -   - 2. 尝试按行业或政策类型分类查询
+2025-07-01 02:15:55,185 - __main__ - INFO - 启动API服务...
+2025-07-01 02:23:10,853 - __main__ - INFO - 启动政策匹配RAG检索系统
+2025-07-01 02:23:10,854 - __main__ - INFO - 正在初始化政策匹配系统...
+2025-07-01 02:23:11,886 - vector_store - INFO - 已连接到Milvus: localhost:19530
+2025-07-01 02:23:12,422 - vector_store - INFO - 创建新集合: policy_collection
+2025-07-01 02:23:15,113 - vector_store - ERROR - 连接Elasticsearch失败: Elasticsearch.__init__() got an unexpected keyword argument 'timeout'
+2025-07-01 02:23:15,114 - vector_store - ERROR - 获取统计信息失败: 'Collection' object has no attribute 'get_stats'
+2025-07-01 02:23:17,406 - embeddings - INFO - 正在加载嵌入模型: moka-ai/m3e-base
+2025-07-01 02:23:17,406 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: moka-ai/m3e-base
+2025-07-01 02:23:22,314 - embeddings - INFO - 模型加载完成，使用设备: cpu
+2025-07-01 02:23:22,315 - __main__ - INFO - 系统状态: {'status': '运行中', 'vector_store': {'milvus_connected': True, 'elasticsearch_connected': False, 'milvus_stats': {}, 'elasticsearch_stats': {}}, 'embedding_model': {'status': 'loaded', 'model_name': 'moka-ai/m3e-base', 'device': 'cpu', 'embedding_dim': 768, 'max_seq_length': 512}, 'components': {'document_processor': '正常', 'retriever': '正常', 'matcher': '正常'}}
+2025-07-01 02:23:22,315 - __main__ - INFO - 发现政策文档: 北京市产业政策导引.pdf，开始加载...
+2025-07-01 02:23:22,315 - policy_matcher - INFO - 开始添加政策文档: 北京市产业政策导引.pdf
+2025-07-01 02:23:22,543 - jieba - DEBUG - Building prefix dict from the default dictionary ...
+2025-07-01 02:23:22,543 - jieba - DEBUG - Loading model from cache /var/folders/w7/v83dx60s0wnf6qh99wjhckhc0000gn/T/jieba.cache
+2025-07-01 02:23:22,821 - jieba - DEBUG - Loading model cost 0.278 seconds.
+2025-07-01 02:23:22,821 - jieba - DEBUG - Prefix dict has been built successfully.
+2025-07-01 02:23:22,822 - document_processor - INFO - 开始处理文档: 北京市产业政策导引.pdf
+2025-07-01 02:23:25,444 - __main__ - INFO - 用户中断，正在关闭系统...
