@@ -56,7 +56,7 @@ class MilvusStore:
     def _create_collection(self):
         """创建新集合"""
         try:
-            # 定义字段
+            # 定义字段 - 顺序必须与插入顺序完全一致
             fields = [
                 FieldSchema(name="chunk_id", dtype=DataType.VARCHAR, max_length=256, is_primary=True),
                 FieldSchema(name="policy_id", dtype=DataType.VARCHAR, max_length=256),
@@ -102,29 +102,104 @@ class MilvusStore:
             return False
         
         try:
-            # 准备数据
-            data = {
-                "chunk_id": [chunk.chunk_id for chunk in chunks],
-                "policy_id": [chunk.policy_id for chunk in chunks],
-                "content": [chunk.content[:2048] for chunk in chunks],  # 限制长度
-                "section": [chunk.section or "" for chunk in chunks],
-                "chunk_type": [chunk.chunk_type for chunk in chunks],
-                "embedding": embeddings.tolist()
-            }
+            # 准备数据，严格控制字段长度（按字节计算）
+            def safe_truncate(text, max_bytes):
+                """安全截断文本，确保不超过最大字节数"""
+                if not text:
+                    return ""
+                text_str = str(text)
+                text_bytes = text_str.encode('utf-8')
+                if len(text_bytes) <= max_bytes:
+                    return text_str
+                # 如果超长，按字节截断并确保不切断中文字符
+                truncated = text_bytes[:max_bytes]
+                # 处理可能的不完整UTF-8字符
+                while len(truncated) > 0:
+                    try:
+                        return truncated.decode('utf-8')
+                    except UnicodeDecodeError:
+                        truncated = truncated[:-1]
+                return ""
             
+            chunk_ids = [safe_truncate(chunk.chunk_id, 250) for chunk in chunks]
+            policy_ids = [safe_truncate(chunk.policy_id, 250) for chunk in chunks]  
+            contents = [safe_truncate(chunk.content, 1900) for chunk in chunks]  # 留足够余量
+            sections = [safe_truncate(chunk.section or "", 250) for chunk in chunks]
+            chunk_types = [safe_truncate(chunk.chunk_type, 60) for chunk in chunks]
+            embedding_list = embeddings.tolist()
+            
+            # 调试信息
+            logger.info(f"准备插入数据: chunks数量={len(chunks)}, embeddings形状={embeddings.shape}")
+            logger.info(f"chunk_ids类型: {type(chunk_ids)}, 样例: {chunk_ids[:2] if chunk_ids else []}")
+            logger.info(f"embedding_list类型: {type(embedding_list)}, 长度: {len(embedding_list)}")
+            
+            # 按字段顺序组织数据（列表的列表）
+            data_to_insert = [
+                chunk_ids,       # 对应字段: chunk_id (VARCHAR)
+                policy_ids,      # 对应字段: policy_id (VARCHAR)
+                contents,        # 对应字段: content (VARCHAR)
+                sections,        # 对应字段: section (VARCHAR)
+                chunk_types,     # 对应字段: chunk_type (VARCHAR)
+                embedding_list   # 对应字段: embedding (FLOAT_VECTOR)
+            ]
+
+            # 验证数据类型
+            if not self._validate_data_types(data_to_insert):
+                return False
+
             # 插入数据
-            insert_result = self.collection.insert(data)
-            
+            insert_result = self.collection.insert(data_to_insert)
+
             # 刷新
             self.collection.flush()
-            
+
             logger.info(f"成功插入 {len(chunks)} 个分块到Milvus")
             return True
-            
+        
         except Exception as e:
             logger.error(f"插入数据到Milvus失败: {e}")
             return False
-    
+
+    def _validate_data_types(self, data_list):
+        """验证数据类型是否匹配集合模式"""
+        if not self.collection:
+            return False
+
+        schema = self.collection.schema
+        for i, field in enumerate(schema.fields):
+            field_name = field.name
+            field_type = field.dtype
+            sample_value = data_list[i][0] if data_list[i] else None
+
+            logger.info(f"验证字段 {field_name} (Milvus类型: {field_type}) - "
+                        f"样例值: {sample_value} - Python类型: {type(sample_value)}")
+
+            # 特殊处理向量字段
+            if field_type == DataType.FLOAT_VECTOR:
+                if not isinstance(data_list[i], list) or not all(isinstance(vec, list) for vec in data_list[i]):
+                    logger.error(f"字段 {field_name} 应为向量列表，实际类型: {type(data_list[i])}")
+                    return False
+            else:
+                # 检查第一个元素的类型
+                if data_list[i] and not isinstance(sample_value, self._get_python_type(field_type)):
+                    logger.error(
+                        f"字段 {field_name} 应为 {self._get_python_type(field_type)}，实际类型: {type(sample_value)}")
+                    return False
+        return True
+
+    @staticmethod
+    def _get_python_type(milvus_type):
+        """映射Milvus类型到Python类型"""
+        type_map = {
+            DataType.VARCHAR: str,
+            DataType.INT64: int,
+            DataType.FLOAT: float,
+            DataType.DOUBLE: float,
+            DataType.BOOL: bool,
+            DataType.JSON: dict
+        }
+        return type_map.get(milvus_type, object)
+
     def search(self, query_embedding: np.ndarray, top_k: int = 10, filters: Dict = None) -> List[RetrievalResult]:
         """向量相似度搜索"""
         if not self.connected:
@@ -221,7 +296,7 @@ class ElasticsearchStore:
         """连接到Elasticsearch"""
         try:
             self.client = Elasticsearch(
-                hosts=[f"{config.ES_HOST}:{config.ES_PORT}"],
+                hosts=[f"http://{config.ES_HOST}:{config.ES_PORT}"],
                 request_timeout=30
             )
             
@@ -257,9 +332,9 @@ class ElasticsearchStore:
                     "properties": {
                         "chunk_id": {"type": "keyword"},
                         "policy_id": {"type": "keyword"},
-                        "title": {"type": "text", "analyzer": "ik_max_word"},
-                        "content": {"type": "text", "analyzer": "ik_max_word"},
-                        "section": {"type": "text", "analyzer": "ik_max_word"},
+                        "title": {"type": "text", "analyzer": "standard"},
+                        "content": {"type": "text", "analyzer": "standard"},
+                        "section": {"type": "text", "analyzer": "standard"},
                         "chunk_type": {"type": "keyword"},
                         "keywords": {"type": "keyword"},
                         "industries": {"type": "keyword"},
@@ -272,8 +347,8 @@ class ElasticsearchStore:
                 "settings": {
                     "analysis": {
                         "analyzer": {
-                            "ik_max_word": {
-                                "type": "standard"  # 如果没有安装ik，使用标准分析器
+                            "default": {
+                                "type": "standard"
                             }
                         }
                     }
@@ -297,26 +372,37 @@ class ElasticsearchStore:
             return False
         
         try:
+            # 安全截断函数，确保不超过ES字段限制
+            def safe_truncate_es(text, max_chars=8000):
+                """安全截断文本，避免ES字段过长"""
+                if not text:
+                    return ""
+                text_str = str(text)
+                if len(text_str) <= max_chars:
+                    return text_str
+                return text_str[:max_chars]
+            
             actions = []
             for chunk in chunks:
+                # 确保所有字段长度合适
                 doc = {
-                    "chunk_id": chunk.chunk_id,
-                    "policy_id": chunk.policy_id,
-                    "title": policy_title,
-                    "content": chunk.content,
-                    "section": chunk.section,
-                    "chunk_type": chunk.chunk_type,
-                    "keywords": chunk.keywords,
-                    "page_num": chunk.page_num,
+                    "chunk_id": safe_truncate_es(chunk.chunk_id, 512),
+                    "policy_id": safe_truncate_es(chunk.policy_id, 512),
+                    "title": safe_truncate_es(policy_title, 1000),
+                    "content": safe_truncate_es(chunk.content, 8000),  # ES默认最大8000字符
+                    "section": safe_truncate_es(chunk.section, 1000),
+                    "chunk_type": safe_truncate_es(chunk.chunk_type, 100),
+                    "keywords": chunk.keywords[:50] if chunk.keywords else [],  # 限制关键词数量
+                    "page_num": chunk.page_num if chunk.page_num is not None else 0,
                     "created_at": "now"
                 }
                 
-                # 添加政策元数据
+                # 添加政策元数据，同样进行长度控制
                 if policy_metadata:
                     doc.update({
-                        "industries": policy_metadata.get('industries', []),
-                        "enterprise_scales": policy_metadata.get('enterprise_scales', []),
-                        "policy_types": policy_metadata.get('policy_types', [])
+                        "industries": (policy_metadata.get('industries', []) or [])[:20],  # 限制数组长度
+                        "enterprise_scales": (policy_metadata.get('enterprise_scales', []) or [])[:20],
+                        "policy_types": (policy_metadata.get('policy_types', []) or [])[:20]
                     })
                 
                 actions.append({
@@ -325,14 +411,47 @@ class ElasticsearchStore:
                     "_source": doc
                 })
             
-            # 批量索引
+            # 批量索引，获取详细错误信息
             try:
                 from elasticsearch.helpers import bulk
-                success, failed = bulk(self.client, actions)
-                logger.info(f"ES索引成功: {success}, 失败: {len(failed) if failed else 0}")
-                return True
+                logger.info(f"准备索引 {len(actions)} 个文档到ES")
+                
+                # 使用streaming_bulk获取详细错误信息
+                from elasticsearch.helpers import streaming_bulk
+                
+                success_count = 0
+                failed_count = 0
+                failed_examples = []
+                
+                # 直接使用bulk并获取详细错误
+                success, failed = bulk(
+                    self.client,
+                    actions,
+                    request_timeout=60,
+                    max_retries=3,
+                    stats_only=False
+                )
+                
+                success_count = success
+                failed_count = len(failed) if failed else 0
+                
+                if failed_count > 0:
+                    logger.error(f"ES索引失败: {failed_count} 个文档失败, {success_count} 个成功")
+                    # 显示前3个失败案例的详细错误信息
+                    for i, fail_doc in enumerate(failed[:3]):
+                        error_detail = fail_doc.get('index', {})
+                        doc_id = error_detail.get('_id', 'unknown')
+                        error_info = error_detail.get('error', {})
+                        error_type = error_info.get('type', 'unknown')
+                        error_reason = error_info.get('reason', 'no reason provided')
+                        logger.error(f"失败文档 {i+1} (ID: {doc_id}): 类型={error_type}, 原因={error_reason}")
+                else:
+                    logger.info(f"ES索引完全成功: {success_count} 个文档")
+                
+                return success_count > 0
+                
             except Exception as bulk_error:
-                logger.error(f"ES批量索引失败: {bulk_error}")
+                logger.error(f"ES批量索引异常: {bulk_error}")
                 return False
             
         except Exception as e:

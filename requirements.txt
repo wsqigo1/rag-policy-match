@@ -15,6 +15,13 @@ transformers==4.35.2
 torch==2.1.1
 numpy==1.24.3
 
+# 跨编码器重排（新增）
+FlagEmbedding==1.2.5
+
+# 稀疏检索和多表示索引（新增）
+rank-bm25==0.2.2
+scikit-learn==1.3.2
+
 # 向量数据库
 pymilvus==2.3.4
 elasticsearch==8.11.0
@@ -23,12 +30,27 @@ elasticsearch==8.11.0
 jieba==0.42.1
 pypinyin==0.49.0
 
-# 其他工具
-redis==5.0.1
-pandas==2.1.3
+# LLM API调用（新增）
 requests==2.31.0
+aiohttp==3.9.1
+openai==1.6.1  # 用于标准化API接口
+
+# 数据处理和分析
+pandas==2.1.3
 tqdm==4.66.1
-scikit-learn==1.3.2
+
+# 缓存和存储
+redis==5.0.1
 
 # API相关
-python-multipart==0.0.6 
+python-multipart==0.0.6
+
+# 日志和监控（新增）
+loguru==0.7.2
+
+# 配置管理（新增）
+python-dotenv==1.0.0
+
+# 异步处理（新增）
+asyncio==3.4.3
+aiofiles==23.2.0 

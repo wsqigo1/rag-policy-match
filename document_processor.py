@@ -4,28 +4,362 @@ import pdfplumber
 import docx2txt
 import jieba
 import hashlib
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from pathlib import Path
 import logging
+# from docx import Document as DocxDocument  # 暂时注释掉，需要时再启用
 
-from models import PolicyDocument, PolicyChunk
-from config import config
+from models import PolicyDocument, PolicyChunk, StructuredPolicy
+from config import config, Config
 
 logger = logging.getLogger(__name__)
 
-class DocumentProcessor:
-    """文档处理器"""
+class StructuredPolicyExtractor:
+    """结构化政策信息提取器"""
     
     def __init__(self):
-        # 初始化jieba分词
-        jieba.initialize()
+        # 结构化字段的正则模式
+        self.field_patterns = {
+            'basis_document': [
+                r'依据文件[：:]\s*(.*?)(?=\n|$)',
+                r'制定依据[：:]\s*(.*?)(?=\n|$)',
+                r'政策依据[：:]\s*(.*?)(?=\n|$)'
+            ],
+            'issuing_agency': [
+                r'发文机构[：:]\s*(.*?)(?=\n|$)',
+                r'制定单位[：:]\s*(.*?)(?=\n|$)',
+                r'发布单位[：:]\s*(.*?)(?=\n|$)',
+                r'主管部门[：:]\s*(.*?)(?=\n|$)'
+            ],
+            'document_number': [
+                r'发文字号[：:]\s*(.*?)(?=\n|$)',
+                r'文件编号[：:]\s*(.*?)(?=\n|$)',
+                r'([京津沪渝黑吉辽蒙冀豫鲁苏皖浙闽赣湘鄂桂琼川贵滇藏陕甘宁青新].*?[〔\[]\d{4}[〕\]]\s*\d+\s*号)',
+            ],
+            'issue_date': [
+                r'发布日期[：:]\s*(.*?)(?=\n|$)',
+                r'印发日期[：:]\s*(.*?)(?=\n|$)',
+                r'生效日期[：:]\s*(.*?)(?=\n|$)',
+                r'(\d{4}[-年]\d{1,2}[-月]\d{1,2}[日]?)',
+            ],
+            'tool_category': [
+                r'工具分类[：:]\s*(.*?)(?=\n|$)',
+                r'政策类型[：:]\s*(.*?)(?=\n|$)',
+                r'支持方式[：:]\s*(.*?)(?=\n|$)',
+                r'(资金支持|政策支持|税收优惠|平台支持|人才支持)'
+            ],
+            'service_object': [
+                r'服务对象[：:]\s*(.*?)(?=\n|$)',
+                r'适用对象[：:]\s*(.*?)(?=\n|$)',
+                r'申请主体[：:]\s*(.*?)(?=\n|$)'
+            ],
+            'service_content': [
+                r'服务内容[：:]\s*(.*?)(?=\n|$)',
+                r'支持内容[：:]\s*(.*?)(?=\n|$)',
+                r'主要内容[：:]\s*(.*?)(?=\n|$)'
+            ],
+            'condition_requirements': [
+                r'条件要求[：:]\s*(.*?)(?=\n|$)',
+                r'申请条件[：:]\s*(.*?)(?=\n|$)',
+                r'基本条件[：:]\s*(.*?)(?=\n|$)',
+                r'资格要求[：:]\s*(.*?)(?=\n|$)'
+            ],
+            'service_process': [
+                r'服务流程[：:]\s*(.*?)(?=\n|$)',
+                r'申请流程[：:]\s*(.*?)(?=\n|$)',
+                r'办理流程[：:]\s*(.*?)(?=\n|$)'
+            ],
+            'time_frequency': [
+                r'时间[/／]频度[：:]\s*(.*?)(?=\n|$)',
+                r'申请时间[：:]\s*(.*?)(?=\n|$)',
+                r'受理时间[：:]\s*(.*?)(?=\n|$)',
+                r'常年受理|随时申请|按批次|每年\d+次|定期'
+            ],
+            'contact_info': [
+                r'联络方式[：:]\s*(.*?)(?=\n|$)',
+                r'联系方式[：:]\s*(.*?)(?=\n|$)',
+                r'咨询电话[：:]\s*(.*?)(?=\n|$)',
+                r'(\d{3,4}[-\s]?\d{7,8}|\d{11})'
+            ]
+        }
         
-        # 编译正则表达式
-        self.title_pattern = re.compile(r'^[一二三四五六七八九十\d]+[、\.\s].*|第[一二三四五六七八九十\d]+[章节条款].*')
-        self.section_pattern = re.compile(r'[（(][一二三四五六七八九十\d]+[)）].*')
-        self.money_pattern = re.compile(r'[\d,，]+\s*万元|[\d,，]+\s*元|[\d,，]+\s*亿元')
-        self.requirement_pattern = re.compile(r'应当|必须|需要|要求|条件|标准|规定')
+        # 关键信息提取模式
+        self.analysis_patterns = {
+            'industries': [
+                r'(生物医药|人工智能|集成电路|新能源|新材料|高端装备|节能环保|数字创意|软件信息|航空航天|海洋工程)',
+                r'(制造业|服务业|农业|建筑业|采矿业|金融业|房地产业|批发零售业|交通运输业|信息技术业)'
+            ],
+            'enterprise_scales': [
+                r'(大型企业|中型企业|小型企业|微型企业)',
+                r'(初创企业|成长型企业|成熟企业)',
+                r'(上市公司|非上市公司)',
+                r'(国有企业|民营企业|外资企业)'
+            ],
+            'support_amounts': [
+                r'(\d+(?:\.\d+)?)\s*(?:万元|万|万人民币)',
+                r'(\d+(?:\.\d+)?)\s*(?:亿元|亿)',
+                r'最高[支持]?(?:金额)?[：:]?\s*(\d+(?:\.\d+)?)\s*(?:万元|万|亿元|亿)',
+                r'不超过\s*(\d+(?:\.\d+)?)\s*(?:万元|万|亿元|亿)'
+            ]
+        }
+
+    def extract_structured_fields(self, content: str) -> Dict[str, Any]:
+        """提取结构化字段"""
+        extracted = {}
         
+        # 提取主要结构化字段
+        for field_name, patterns in self.field_patterns.items():
+            extracted[field_name] = self._extract_field_value(content, patterns)
+        
+        # 提取分析字段
+        extracted['industries'] = self._extract_list_values(content, self.analysis_patterns['industries'])
+        extracted['enterprise_scales'] = self._extract_list_values(content, self.analysis_patterns['enterprise_scales'])
+        extracted['support_amount_range'] = self._extract_support_amounts(content)
+        
+        return extracted
+
+    def _extract_field_value(self, content: str, patterns: List[str]) -> Optional[str]:
+        """提取单个字段值"""
+        for pattern in patterns:
+            matches = re.finditer(pattern, content, re.IGNORECASE | re.MULTILINE)
+            for match in matches:
+                if match.groups():
+                    value = match.group(1).strip()
+                    if value and len(value) > 3:  # 过滤太短的匹配
+                        return value
+                else:
+                    return match.group(0).strip()
+        return None
+
+    def _extract_list_values(self, content: str, patterns: List[str]) -> List[str]:
+        """提取列表值"""
+        values = set()
+        for pattern in patterns:
+            matches = re.finditer(pattern, content, re.IGNORECASE)
+            for match in matches:
+                if match.groups():
+                    values.add(match.group(1))
+                else:
+                    values.add(match.group(0))
+        return list(values)
+
+    def _extract_support_amounts(self, content: str) -> Dict[str, Any]:
+        """提取支持金额范围"""
+        amounts = []
+        for pattern in self.analysis_patterns['support_amounts']:
+            matches = re.finditer(pattern, content, re.IGNORECASE)
+            for match in matches:
+                try:
+                    amount = float(match.group(1))
+                    if '亿' in match.group(0):
+                        amount *= 10000  # 转换为万元
+                    amounts.append(amount)
+                except (ValueError, IndexError):
+                    continue
+        
+        if amounts:
+            return {
+                'min_amount': min(amounts),
+                'max_amount': max(amounts),
+                'amounts': amounts
+            }
+        return {}
+
+class DocumentProcessor:
+    """增强的文档处理器"""
+    
+    def __init__(self, config: Config):
+        self.config = config
+        self.extractor = StructuredPolicyExtractor()
+        
+    def process_pdf(self, pdf_path: str) -> PolicyDocument:
+        """处理PDF文档并提取结构化信息"""
+        logger.info(f"Processing PDF: {pdf_path}")
+        
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                full_text = ""
+                pages_content = []
+                
+                for i, page in enumerate(pdf.pages):
+                    page_text = page.extract_text() or ""
+                    full_text += page_text + "\n"
+                    pages_content.append({
+                        'page_num': i + 1,
+                        'content': page_text
+                    })
+                
+                # 提取结构化字段
+                structured_fields = self.extractor.extract_structured_fields(full_text)
+                
+                # 创建结构化政策对象
+                structured_policy = StructuredPolicy(
+                    policy_id=Path(pdf_path).stem,
+                    title=self._extract_title(full_text),
+                    full_content=full_text,
+                    **structured_fields
+                )
+                
+                # 创建分块
+                chunks = self._create_enhanced_chunks(
+                    full_text, 
+                    pages_content, 
+                    structured_policy
+                )
+                structured_policy.chunks = chunks
+                
+                return PolicyDocument(
+                    document_id=Path(pdf_path).stem,
+                    title=structured_policy.title,
+                    content=full_text,
+                    chunks=chunks,
+                    metadata={
+                        'source': pdf_path,
+                        'type': 'pdf',
+                        'structured_policy': structured_policy.__dict__
+                    }
+                )
+                
+        except Exception as e:
+            logger.error(f"Error processing PDF {pdf_path}: {str(e)}")
+            raise
+
+    def _extract_title(self, content: str) -> str:
+        """提取政策标题"""
+        lines = content.split('\n')
+        for line in lines[:10]:  # 检查前10行
+            line = line.strip()
+            if len(line) > 10 and not line.startswith(('附件', '文件', '编号')):
+                return line
+        return "未知政策标题"
+
+    def _create_enhanced_chunks(self, content: str, pages_content: List[Dict], 
+                               structured_policy: StructuredPolicy) -> List[PolicyChunk]:
+        """创建增强的分块，包含结构化信息"""
+        chunks = []
+        
+        # 分段处理
+        sections = self._split_into_sections(content)
+        
+        for i, section in enumerate(sections):
+            if len(section.strip()) < 50:  # 跳过太短的段落
+                continue
+                
+            chunk_id = f"{structured_policy.policy_id}_chunk_{i}"
+            
+            # 确定chunk类型和重要性
+            chunk_type, section_name = self._classify_chunk(section)
+            
+            chunk = PolicyChunk(
+                chunk_id=chunk_id,
+                policy_id=structured_policy.policy_id,
+                content=section,
+                section=section_name,
+                chunk_type=chunk_type,
+                keywords=self._extract_keywords(section),
+                
+                # 继承结构化字段
+                basis_document=structured_policy.basis_document,
+                issuing_agency=structured_policy.issuing_agency,
+                document_number=structured_policy.document_number,
+                issue_date=structured_policy.issue_date,
+                tool_category=structured_policy.tool_category,
+                service_object=structured_policy.service_object,
+                service_content=structured_policy.service_content,
+                condition_requirements=structured_policy.condition_requirements,
+                service_process=structured_policy.service_process,
+                time_frequency=structured_policy.time_frequency,
+                contact_info=structured_policy.contact_info,
+                
+                # 分析相关字段
+                policy_level=self._determine_policy_level(structured_policy.issuing_agency),
+                support_amount=str(structured_policy.support_amount_range) if structured_policy.support_amount_range else None,
+            )
+            
+            chunks.append(chunk)
+        
+        return chunks
+
+    def _split_into_sections(self, content: str) -> List[str]:
+        """智能分段"""
+        # 按标题和段落分割
+        patterns = [
+            r'\n\s*[一二三四五六七八九十]\s*[、．.]\s*',  # 中文数字标题
+            r'\n\s*\d+\s*[、．.]\s*',  # 阿拉伯数字标题
+            r'\n\s*[（(]\s*[一二三四五六七八九十]\s*[）)]\s*',  # 括号中文数字
+            r'\n\s*[（(]\s*\d+\s*[）)]\s*',  # 括号阿拉伯数字
+            r'\n\s*第[一二三四五六七八九十\d]+[章节条款项]\s*',  # 第X章节
+        ]
+        
+        # 找到所有分割点
+        split_points = [0]
+        for pattern in patterns:
+            matches = re.finditer(pattern, content)
+            for match in matches:
+                split_points.append(match.start())
+        
+        split_points.append(len(content))
+        split_points = sorted(set(split_points))
+        
+        # 创建段落
+        sections = []
+        for i in range(len(split_points) - 1):
+            section = content[split_points[i]:split_points[i + 1]].strip()
+            if section:
+                sections.append(section)
+        
+        return sections
+
+    def _classify_chunk(self, content: str) -> Tuple[str, str]:
+        """分类chunk类型和段落名称"""
+        content_lower = content.lower()
+        
+        # 根据内容判断类型和名称
+        if any(keyword in content_lower for keyword in ['条件要求', '申请条件', '基本条件']):
+            return 'condition', '条件要求'
+        elif any(keyword in content_lower for keyword in ['服务内容', '支持内容', '主要内容']):
+            return 'service', '服务内容'
+        elif any(keyword in content_lower for keyword in ['服务流程', '申请流程', '办理流程']):
+            return 'process', '服务流程'
+        elif any(keyword in content_lower for keyword in ['联系方式', '联络方式', '咨询电话']):
+            return 'contact', '联络方式'
+        elif any(keyword in content_lower for keyword in ['服务对象', '适用对象']):
+            return 'target', '服务对象'
+        else:
+            return 'general', '一般内容'
+
+    def _extract_keywords(self, content: str) -> List[str]:
+        """提取关键词"""
+        # 简单的关键词提取
+        import jieba
+        
+        # 分词
+        words = jieba.lcut(content)
+        
+        # 过滤停用词和短词
+        stop_words = {'的', '是', '在', '有', '和', '与', '或', '等', '及', '对', '为', '以', '按', '由'}
+        keywords = [word for word in words if len(word) > 1 and word not in stop_words]
+        
+        # 返回出现频次较高的词
+        from collections import Counter
+        word_freq = Counter(keywords)
+        return [word for word, freq in word_freq.most_common(10)]
+
+    def _determine_policy_level(self, issuing_agency: Optional[str]) -> str:
+        """确定政策级别"""
+        if not issuing_agency:
+            return "未知"
+        
+        agency_lower = issuing_agency.lower()
+        if any(keyword in agency_lower for keyword in ['国务院', '发改委', '工信部', '科技部']):
+            return "国家级"
+        elif any(keyword in agency_lower for keyword in ['北京市', '市政府', '市委']):
+            return "市级"
+        elif any(keyword in agency_lower for keyword in ['区政府', '区委', '街道']):
+            return "区级"
+        else:
+            return "其他"
+
     def extract_text_from_pdf(self, file_path: str) -> Tuple[str, List[Dict]]:
         """从PDF提取文本和表格"""
         try:
@@ -205,20 +539,6 @@ class DocumentProcessor:
             chunks.append(current_chunk.strip())
         
         return chunks
-    
-    def _extract_keywords(self, text: str) -> List[str]:
-        """提取关键词"""
-        # 使用jieba分词
-        words = jieba.cut(text)
-        
-        # 过滤停用词和短词
-        stop_words = {'的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没', '看', '好', '自己', '这', '那', '之', '与', '或', '等', '及'}
-        keywords = [word for word in words if len(word) > 1 and word not in stop_words]
-        
-        # 返回频次最高的关键词
-        from collections import Counter
-        word_freq = Counter(keywords)
-        return [word for word, _ in word_freq.most_common(10)]
     
     def generate_policy_id(self, file_path: str) -> str:
         """生成政策ID"""

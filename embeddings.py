@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Union
+from typing import List, Union, Optional
 import logging
 from sentence_transformers import SentenceTransformer
 import torch
@@ -12,7 +12,7 @@ class EmbeddingManager:
     """向量化管理器"""
     
     def __init__(self):
-        self.model = None
+        self.model: Optional[SentenceTransformer] = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self._load_model()
     
@@ -47,6 +47,10 @@ class EmbeddingManager:
         if not texts:
             return np.array([])
         
+        if self.model is None:
+            logger.error("模型未加载")
+            return np.array([])
+        
         try:
             logger.info(f"开始编码 {len(texts)} 个文本")
             
@@ -64,6 +68,10 @@ class EmbeddingManager:
                 convert_to_numpy=True,
                 normalize_embeddings=True  # 归一化向量
             )
+            
+            # 确保返回numpy数组（convert_to_numpy=True应该已经处理）
+            if not isinstance(embeddings, np.ndarray):
+                embeddings = np.array(embeddings)
             
             logger.info(f"编码完成，输出形状: {embeddings.shape}")
             return embeddings
@@ -85,13 +93,22 @@ class EmbeddingManager:
         if not text or not text.strip():
             return np.zeros(config.EMBEDDING_DIM)
         
+        if self.model is None:
+            logger.error("模型未加载")
+            return np.zeros(config.EMBEDDING_DIM)
+        
         try:
             embedding = self.model.encode(
                 [text.strip()], 
                 convert_to_numpy=True,
                 normalize_embeddings=True
             )
-            return embedding[0]
+            
+            # 确保返回numpy数组（convert_to_numpy=True应该已经处理）
+            if not isinstance(embedding, np.ndarray):
+                embedding = np.array(embedding)
+            
+            return embedding[0] if len(embedding.shape) > 1 else embedding
             
         except Exception as e:
             logger.error(f"单文本编码失败: {e}")
@@ -127,7 +144,7 @@ class EmbeddingManager:
     
     def expand_query(self, query: str) -> List[str]:
         """
-        查询扩展：生成语义相似的查询词
+        智能查询扩展：基于自然语言理解生成语义相似的查询词
         
         Args:
             query: 原始查询
@@ -136,33 +153,124 @@ class EmbeddingManager:
             扩展后的查询列表
         """
         expanded_queries = [query]
-        
-        # 基于配置的映射进行查询扩展
         query_lower = query.lower()
         
-        # 行业扩展
+        # 1. 基于意图的查询扩展
+        intent_expansions = self._expand_by_intent(query_lower)
+        expanded_queries.extend(intent_expansions)
+        
+        # 2. 基于行业的查询扩展
+        industry_expansions = self._expand_by_industry(query_lower)
+        expanded_queries.extend(industry_expansions)
+        
+        # 3. 基于企业规模的查询扩展  
+        scale_expansions = self._expand_by_enterprise_scale(query_lower)
+        expanded_queries.extend(scale_expansions)
+        
+        # 4. 基于政策类型的查询扩展
+        policy_expansions = self._expand_by_policy_type(query_lower)
+        expanded_queries.extend(policy_expansions)
+        
+        # 5. 基于同义词的扩展
+        synonym_expansions = self._expand_by_synonyms(query_lower)
+        expanded_queries.extend(synonym_expansions)
+        
+        # 去重并返回
+        unique_queries = []
+        for q in expanded_queries:
+            if q not in unique_queries and len(q.strip()) > 0:
+                unique_queries.append(q)
+        
+        return unique_queries[:10]  # 限制扩展查询数量
+    
+    def _expand_by_intent(self, query: str) -> List[str]:
+        """基于用户意图扩展查询"""
+        expansions = []
+        
+        # 查找政策意图
+        if any(word in query for word in ['查找', '寻找', '想要', '需要', '有什么', '哪些']):
+            expansions.extend(['政策支持', '扶持政策', '优惠政策'])
+        
+        # 适用性意图
+        if any(word in query for word in ['适用', '适合', '可以申请', '符合条件']):
+            expansions.extend(['申请条件', '适用范围', '服务对象'])
+        
+        # 资金支持意图
+        if any(word in query for word in ['资金', '补贴', '奖励', '资助', '支持']):
+            expansions.extend(['专项资金', '财政支持', '资金扶持', '补助资金'])
+        
+        return expansions
+    
+    def _expand_by_industry(self, query: str) -> List[str]:
+        """基于行业扩展查询"""
+        expansions = []
+        
         for industry, keywords in config.INDUSTRY_MAPPING.items():
             for keyword in keywords:
-                if keyword in query_lower:
-                    # 添加同义词
-                    expanded_queries.extend([k for k in keywords if k != keyword and k not in expanded_queries])
+                if keyword in query:
+                    # 添加同行业的其他关键词
+                    expansions.extend([k for k in keywords if k != keyword])
+                    # 添加行业相关的政策词汇
+                    expansions.append(f"{industry}政策")
+                    expansions.append(f"{industry}扶持")
                     break
         
-        # 企业规模扩展
+        return expansions
+    
+    def _expand_by_enterprise_scale(self, query: str) -> List[str]:
+        """基于企业规模扩展查询"""
+        expansions = []
+        
         for scale, keywords in config.ENTERPRISE_SCALES.items():
             for keyword in keywords:
-                if keyword in query_lower:
-                    expanded_queries.extend([k for k in keywords if k != keyword and k not in expanded_queries])
+                if keyword in query:
+                    # 添加同规模的其他表述
+                    expansions.extend([k for k in keywords if k != keyword])
+                    
+                    # 针对初创企业的特殊扩展
+                    if scale == "初创企业":
+                        expansions.extend([
+                            '创业扶持', '创业支持', '新企业政策', 
+                            '创业孵化', '创业园区', '低门槛政策'
+                        ])
                     break
         
-        # 政策类型扩展
+        return expansions
+    
+    def _expand_by_policy_type(self, query: str) -> List[str]:
+        """基于政策类型扩展查询"""
+        expansions = []
+        
         for policy_type, keywords in config.POLICY_TYPES.items():
             for keyword in keywords:
-                if keyword in query_lower:
-                    expanded_queries.extend([k for k in keywords if k != keyword and k not in expanded_queries])
+                if keyword in query:
+                    # 添加同类型的其他关键词
+                    expansions.extend([k for k in keywords if k != keyword])
                     break
         
-        return list(set(expanded_queries))
+        return expansions
+    
+    def _expand_by_synonyms(self, query: str) -> List[str]:
+        """基于同义词扩展查询"""
+        synonym_map = {
+            '公司': ['企业', '机构', '单位'],
+            '企业': ['公司', '机构', '单位'],
+            '政策': ['措施', '办法', '规定', '条例'],
+            '支持': ['扶持', '帮助', '援助'],
+            '申请': ['申报', '报名', '参与'],
+            '条件': ['要求', '标准', '资格'],
+            '资金': ['资助', '补贴', '奖励', '拨款'],
+            '创新': ['科技', '技术', '研发'],
+            '小型': ['小微', '中小'],
+            '初创': ['新成立', '创业', '起步']
+        }
+        
+        expansions = []
+        for word, synonyms in synonym_map.items():
+            if word in query:
+                expansions.extend(synonyms)
+        
+        return expansions
     
     def get_model_info(self) -> dict:
         """获取模型信息"""
