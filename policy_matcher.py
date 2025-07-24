@@ -705,6 +705,279 @@ class EnhancedPolicyMatcher:
         else:
             return "可行性较低，需要显著改善条件"
     
+    def basic_match(self, request: 'BasicMatchRequest') -> 'OneClickMatchResponse':
+        """基础匹配功能"""
+        start_time = datetime.now()
+        
+        try:
+            from models import PolicyMatch, OneClickMatchResponse
+            
+            # 模拟基础匹配结果
+            matches = []
+            
+            # 基于行业的简单匹配逻辑
+            mock_policies = [
+                {
+                    "policy_id": "policy_001",
+                    "policy_name": "生物医药产业发展支持政策",
+                    "match_score": 0.85,
+                    "match_level": "高",
+                    "key_description": "支持生物医药企业研发创新，提供最高500万元资金支持，适合初创企业申请",
+                    "policy_type": "资金支持",
+                    "support_content": "研发费用补助、设备购置支持",
+                    "application_conditions": "注册在中关村示范区，成立不超过3年"
+                },
+                {
+                    "policy_id": "policy_002", 
+                    "policy_name": "初创企业孵化器支持计划",
+                    "match_score": 0.78,
+                    "match_level": "高",
+                    "key_description": "为初创企业提供孵化空间和创业辅导，减免租金最高80%，提供专业服务",
+                    "policy_type": "空间支持",
+                    "support_content": "孵化空间、创业辅导、资源对接",
+                    "application_conditions": "成立不超过3年，员工少于20人"
+                },
+                {
+                    "policy_id": "policy_003",
+                    "policy_name": "企业研发费用加计扣除政策",
+                    "match_score": 0.72,
+                    "match_level": "中",
+                    "key_description": "研发费用可享受175%加计扣除，有效降低企业税负，适合有研发投入的企业",
+                    "policy_type": "税收优惠",
+                    "support_content": "研发费用税前加计扣除",
+                    "application_conditions": "有研发活动和费用支出记录"
+                }
+            ]
+            
+            # 根据请求参数过滤和评分
+            for policy in mock_policies:
+                # 行业匹配
+                industry_match = self._match_industry(request.industry, policy)
+                # 企业规模匹配
+                scale_match = self._match_scale(request.company_scale, policy)
+                # 需求类型匹配
+                demand_match = self._match_demand_type(request.demand_type, policy)
+                
+                # 综合评分
+                total_score = (industry_match * 0.4 + scale_match * 0.3 + demand_match * 0.3)
+                
+                if total_score >= 0.5:  # 匹配阈值
+                    match_level = "高" if total_score >= 0.8 else "中" if total_score >= 0.6 else "低"
+                    
+                    matches.append(PolicyMatch(
+                        policy_id=policy["policy_id"],
+                        policy_name=policy["policy_name"],
+                        match_score=round(total_score, 2),
+                        match_level=match_level,
+                        key_description=policy["key_description"],
+                        policy_type=policy["policy_type"],
+                        support_content=policy["support_content"],
+                        application_conditions=policy["application_conditions"]
+                    ))
+            
+            # 按匹配分数排序
+            matches.sort(key=lambda x: x.match_score, reverse=True)
+            
+            processing_time = (datetime.now() - start_time).total_seconds()
+            
+            return OneClickMatchResponse(
+                total_results=len(matches),
+                matches=matches,
+                processing_time=processing_time,
+                match_type="basic",
+                suggestions=[
+                    "建议使用精准匹配功能获得更准确的结果",
+                    "可以上传企业资料进行详细分析",
+                    "关注政策申请时间窗口"
+                ]
+            )
+            
+        except Exception as e:
+            logger.error(f"基础匹配失败: {e}")
+            from models import OneClickMatchResponse
+            processing_time = (datetime.now() - start_time).total_seconds()
+            return OneClickMatchResponse(
+                total_results=0,
+                matches=[],
+                processing_time=processing_time,
+                match_type="basic",
+                suggestions=[f"匹配过程出现错误: {str(e)}"]
+            )
+    
+    def precise_match(self, request: 'PreciseMatchRequest') -> 'OneClickMatchResponse':
+        """精准匹配功能"""
+        start_time = datetime.now()
+        
+        try:
+            from models import PolicyMatch, OneClickMatchResponse
+            
+            # 首先执行基础匹配
+            basic_response = self.basic_match(request.basic_request)
+            
+            # 基于企业详细信息进行精准匹配和重排序
+            enhanced_matches = []
+            
+            for match in basic_response.matches:
+                # 企业信息匹配度分析
+                company_score = self._analyze_company_match(request.company_info, match)
+                
+                # 重新计算匹配分数
+                enhanced_score = (match.match_score * 0.6 + company_score * 0.4)
+                
+                # 生成更详细的描述
+                enhanced_description = self._generate_enhanced_description(
+                    request.company_info, match
+                )
+                
+                enhanced_matches.append(PolicyMatch(
+                    policy_id=match.policy_id,
+                    policy_name=match.policy_name,
+                    match_score=round(enhanced_score, 2),
+                    match_level="高" if enhanced_score >= 0.8 else "中" if enhanced_score >= 0.6 else "低",
+                    key_description=enhanced_description,
+                    policy_type=match.policy_type,
+                    support_content=match.support_content,
+                    application_conditions=match.application_conditions
+                ))
+            
+            # 重新排序
+            enhanced_matches.sort(key=lambda x: x.match_score, reverse=True)
+            
+            # 生成个性化建议
+            suggestions = self._generate_personalized_suggestions(request.company_info)
+            
+            processing_time = (datetime.now() - start_time).total_seconds()
+            
+            return OneClickMatchResponse(
+                total_results=len(enhanced_matches),
+                matches=enhanced_matches,
+                processing_time=processing_time,
+                match_type="precise",
+                suggestions=suggestions
+            )
+            
+        except Exception as e:
+            logger.error(f"精准匹配失败: {e}")
+            from models import OneClickMatchResponse
+            processing_time = (datetime.now() - start_time).total_seconds()
+            return OneClickMatchResponse(
+                total_results=0,
+                matches=[],
+                processing_time=processing_time,
+                match_type="precise",
+                suggestions=[f"匹配过程出现错误: {str(e)}"]
+            )
+    
+    def _match_industry(self, requested_industry: str, policy: dict) -> float:
+        """行业匹配度计算"""
+        # 简化的行业匹配逻辑
+        if "生物医药" in requested_industry:
+            if "生物医药" in policy["policy_name"] or "医药" in policy["key_description"]:
+                return 1.0
+            elif "研发" in policy["key_description"] or "创新" in policy["key_description"]:
+                return 0.8
+        elif "信息技术" in requested_industry:
+            if "科技" in policy["policy_name"] or "技术" in policy["key_description"]:
+                return 1.0
+        
+        # 默认匹配度
+        return 0.6
+    
+    def _match_scale(self, requested_scale: str, policy: dict) -> float:
+        """企业规模匹配度计算"""
+        if "初创" in requested_scale:
+            if "初创" in policy["application_conditions"] or "3年" in policy["application_conditions"]:
+                return 1.0
+            elif "孵化" in policy["policy_name"]:
+                return 0.9
+        elif "中小企业" in requested_scale:
+            if "中小" in policy["application_conditions"]:
+                return 1.0 
+        
+        return 0.7
+    
+    def _match_demand_type(self, requested_demand: str, policy: dict) -> float:
+        """需求类型匹配度计算"""
+        if "资金" in requested_demand:
+            if policy["policy_type"] == "资金支持":
+                return 1.0
+            elif "费用" in policy["support_content"]:
+                return 0.8
+        elif "资质" in requested_demand:
+            if "认定" in policy["policy_name"] or "资质" in policy["policy_type"]:
+                return 1.0
+        elif "空间" in requested_demand:
+            if policy["policy_type"] == "空间支持":
+                return 1.0
+        
+        return 0.5
+    
+    def _analyze_company_match(self, company_info: 'CompanyInfo', match: 'PolicyMatch') -> float:
+        """分析企业信息匹配度"""
+        score = 0.7  # 基础分数
+        
+        # 注册资本匹配
+        if company_info.registered_capital:
+            if company_info.registered_capital <= 1000:  # 小企业
+                if "初创" in match.application_conditions or "小型" in match.application_conditions:
+                    score += 0.1
+            else:  # 大企业
+                if "大型" in match.application_conditions:
+                    score += 0.1
+        
+        # 员工数匹配
+        if company_info.employees:
+            if company_info.employees < 20:
+                if "20人" in match.application_conditions:
+                    score += 0.1
+            elif company_info.employees < 200:
+                if "中小" in match.application_conditions:
+                    score += 0.1
+        
+        # 年营业额匹配
+        if company_info.annual_revenue:
+            if company_info.annual_revenue < 1000:  # 小企业
+                if "初创" in match.application_conditions:
+                    score += 0.1
+        
+        return min(score, 1.0)
+    
+    def _generate_enhanced_description(self, company_info: 'CompanyInfo', match: 'PolicyMatch') -> str:
+        """生成增强的政策描述"""
+        base_description = match.key_description
+        
+        # 添加企业相关的个性化信息
+        if company_info.company_name:
+            if "初创" in company_info.scale or (company_info.employees and company_info.employees < 20):
+                enhanced = f"特别适合{company_info.company_name}等初创企业，{base_description}"
+            else:
+                enhanced = f"适合{company_info.company_name}申请，{base_description}"
+        else:
+            enhanced = base_description
+        
+        return enhanced[:150]  # 限制150字符
+    
+    def _generate_personalized_suggestions(self, company_info: 'CompanyInfo') -> List[str]:
+        """生成个性化建议"""
+        suggestions = []
+        
+        if company_info.registered_capital and company_info.registered_capital <= 500:
+            suggestions.append("作为小规模企业，重点关注初创企业专项政策")
+        
+        if company_info.employees and company_info.employees < 20:
+            suggestions.append("可申请孵化器入驻，享受场地和服务支持")
+        
+        if company_info.annual_revenue and company_info.annual_revenue < 1000:
+            suggestions.append("优先申请资金支持类政策，降低运营成本")
+        
+        if not suggestions:
+            suggestions.append("建议完善企业资料以获得更精准的政策推荐")
+        
+        suggestions.append("及时关注政策申请截止时间")
+        suggestions.append("准备齐全申请材料，提高申请成功率")
+        
+        return suggestions
+    
     def get_system_status(self) -> Dict[str, Any]:
         """获取系统状态"""
         try:
