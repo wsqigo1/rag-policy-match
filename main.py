@@ -153,7 +153,7 @@ def run_test_queries():
         company_info = CompanyInfo(
             company_name="北京智能科技有限公司",
             company_type="有限责任公司",
-            registered_capital="500万元",
+            registered_capital=500.0,  # 修改为数字格式，单位：万元
             establishment_date="2023-01-15",
             registered_address="北京市海淀区中关村",
             business_scope="人工智能技术研发；软件开发；技术咨询服务",

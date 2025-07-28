@@ -172,6 +172,12 @@ class DocumentProcessor:
         self.config = config
         self.extractor = StructuredPolicyExtractor()
         
+        # 初始化正则表达式模式
+        self.money_pattern = re.compile(r'(\d+(?:\.\d+)?(?:万|千|亿)?元?)')
+        self.requirement_pattern = re.compile(r'(?:应当|必须|需要|要求|条件|资格|标准)', re.IGNORECASE)
+        self.title_pattern = re.compile(r'^[一二三四五六七八九十\d]+[、．.]', re.IGNORECASE)
+        self.section_pattern = re.compile(r'^第[一二三四五六七八九十\d]+[章节条款]', re.IGNORECASE)
+        
     def process_pdf(self, pdf_path: str) -> PolicyDocument:
         """处理PDF文档并提取结构化信息"""
         logger.info(f"Processing PDF: {pdf_path}")

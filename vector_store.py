@@ -121,34 +121,37 @@ class MilvusStore:
                         truncated = truncated[:-1]
                 return ""
             
-            chunk_ids = [safe_truncate(chunk.chunk_id, 250) for chunk in chunks]
-            policy_ids = [safe_truncate(chunk.policy_id, 250) for chunk in chunks]  
-            contents = [safe_truncate(chunk.content, 1900) for chunk in chunks]  # 留足够余量
-            sections = [safe_truncate(chunk.section or "", 250) for chunk in chunks]
-            chunk_types = [safe_truncate(chunk.chunk_type, 60) for chunk in chunks]
-            embedding_list = embeddings.tolist()
+            # 构建实体列表（按行组织数据）
+            entities = []
+            for i, chunk in enumerate(chunks):
+                entity = [
+                    safe_truncate(chunk.chunk_id, 250),      # chunk_id (VARCHAR)
+                    safe_truncate(chunk.policy_id, 250),     # policy_id (VARCHAR)  
+                    safe_truncate(chunk.content, 1900),      # content (VARCHAR)
+                    safe_truncate(chunk.section or "", 250), # section (VARCHAR)
+                    safe_truncate(chunk.chunk_type, 60),     # chunk_type (VARCHAR)
+                    embeddings[i].tolist()                   # embedding (FLOAT_VECTOR)
+                ]
+                entities.append(entity)
             
             # 调试信息
             logger.info(f"准备插入数据: chunks数量={len(chunks)}, embeddings形状={embeddings.shape}")
-            logger.info(f"chunk_ids类型: {type(chunk_ids)}, 样例: {chunk_ids[:2] if chunk_ids else []}")
-            logger.info(f"embedding_list类型: {type(embedding_list)}, 长度: {len(embedding_list)}")
+            logger.info(f"实体格式样例: {entities[0] if entities else []}")
             
-            # 按字段顺序组织数据（列表的列表）
-            data_to_insert = [
-                chunk_ids,       # 对应字段: chunk_id (VARCHAR)
-                policy_ids,      # 对应字段: policy_id (VARCHAR)
-                contents,        # 对应字段: content (VARCHAR)
-                sections,        # 对应字段: section (VARCHAR)
-                chunk_types,     # 对应字段: chunk_type (VARCHAR)
-                embedding_list   # 对应字段: embedding (FLOAT_VECTOR)
-            ]
-
-            # 验证数据类型
-            if not self._validate_data_types(data_to_insert):
-                return False
-
-            # 插入数据
-            insert_result = self.collection.insert(data_to_insert)
+            # 验证数据格式
+            if entities:
+                sample_entity = entities[0]
+                for i, field in enumerate(self.collection.schema.fields):
+                    field_name = field.name
+                    field_type = field.dtype
+                    sample_value = sample_entity[i]
+                    
+                    logger.info(f"验证字段 {field_name} (Milvus类型: {field_type}) - "
+                              f"样例值: {str(sample_value)[:100]}{'...' if len(str(sample_value)) > 100 else ''} - "
+                              f"Python类型: {type(sample_value)}")
+            
+            # 插入数据 - 使用实体列表格式
+            insert_result = self.collection.insert(entities)
 
             # 刷新
             self.collection.flush()
@@ -160,45 +163,45 @@ class MilvusStore:
             logger.error(f"插入数据到Milvus失败: {e}")
             return False
 
-    def _validate_data_types(self, data_list):
-        """验证数据类型是否匹配集合模式"""
-        if not self.collection:
-            return False
+    # def _validate_data_types(self, data_list):
+    #     """验证数据类型是否匹配集合模式"""
+    #     if not self.collection:
+    #         return False
 
-        schema = self.collection.schema
-        for i, field in enumerate(schema.fields):
-            field_name = field.name
-            field_type = field.dtype
-            sample_value = data_list[i][0] if data_list[i] else None
+    #     schema = self.collection.schema
+    #     for i, field in enumerate(schema.fields):
+    #         field_name = field.name
+    #         field_type = field.dtype
+    #         sample_value = data_list[i][0] if data_list[i] else None
 
-            logger.info(f"验证字段 {field_name} (Milvus类型: {field_type}) - "
-                        f"样例值: {sample_value} - Python类型: {type(sample_value)}")
+    #         logger.info(f"验证字段 {field_name} (Milvus类型: {field_type}) - "
+    #                     f"样例值: {sample_value} - Python类型: {type(sample_value)}")
 
-            # 特殊处理向量字段
-            if field_type == DataType.FLOAT_VECTOR:
-                if not isinstance(data_list[i], list) or not all(isinstance(vec, list) for vec in data_list[i]):
-                    logger.error(f"字段 {field_name} 应为向量列表，实际类型: {type(data_list[i])}")
-                    return False
-            else:
-                # 检查第一个元素的类型
-                if data_list[i] and not isinstance(sample_value, self._get_python_type(field_type)):
-                    logger.error(
-                        f"字段 {field_name} 应为 {self._get_python_type(field_type)}，实际类型: {type(sample_value)}")
-                    return False
-        return True
+    #         # 特殊处理向量字段
+    #         if field_type == DataType.FLOAT_VECTOR:
+    #             if not isinstance(data_list[i], list) or not all(isinstance(vec, list) for vec in data_list[i]):
+    #                 logger.error(f"字段 {field_name} 应为向量列表，实际类型: {type(data_list[i])}")
+    #                 return False
+    #         else:
+    #             # 检查第一个元素的类型
+    #             if data_list[i] and not isinstance(sample_value, self._get_python_type(field_type)):
+    #                 logger.error(
+    #                     f"字段 {field_name} 应为 {self._get_python_type(field_type)}，实际类型: {type(sample_value)}")
+    #                 return False
+    #     return True
 
-    @staticmethod
-    def _get_python_type(milvus_type):
-        """映射Milvus类型到Python类型"""
-        type_map = {
-            DataType.VARCHAR: str,
-            DataType.INT64: int,
-            DataType.FLOAT: float,
-            DataType.DOUBLE: float,
-            DataType.BOOL: bool,
-            DataType.JSON: dict
-        }
-        return type_map.get(milvus_type, object)
+    # @staticmethod
+    # def _get_python_type(milvus_type):
+    #     """映射Milvus类型到Python类型"""
+    #     type_map = {
+    #         DataType.VARCHAR: str,
+    #         DataType.INT64: int,
+    #         DataType.FLOAT: float,
+    #         DataType.DOUBLE: float,
+    #         DataType.BOOL: bool,
+    #         DataType.JSON: dict
+    #     }
+    #     return type_map.get(milvus_type, object)
 
     def search(self, query_embedding: np.ndarray, top_k: int = 10, filters: Dict = None) -> List[RetrievalResult]:
         """向量相似度搜索"""

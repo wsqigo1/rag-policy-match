@@ -2121,3 +2121,77 @@
 2025-07-01 11:56:35,113 - api - INFO - 收到自测通过率请求: 政策ID=policy_157f44c2, 企业=北京测试科技有限公司
 2025-07-01 11:56:35,113 - policy_matcher - INFO - 开始分析政策资格: 政策ID=policy_157f44c2, 企业=北京测试科技有限公司
 2025-07-01 11:56:35,113 - api - INFO - 自测通过率分析完成: 通过率=10%, 等级=低
+2025-07-28 09:35:23,171 - __main__ - INFO - 启动政策匹配RAG检索系统
+2025-07-28 09:35:23,171 - __main__ - INFO - 正在初始化政策匹配系统...
+2025-07-28 09:35:23,619 - __main__ - INFO - 系统状态: {'status': '运行中', 'vector_store': {'milvus_connected': True, 'elasticsearch_connected': True, 'milvus_stats': {'row_count': 1000}}, 'embedding_model': {'status': 'loaded', 'model_name': 'moka-ai/m3e-base'}, 'llm_manager': {'status': 'ready', 'model': 'deepseek-chat'}}
+2025-07-28 09:35:23,620 - __main__ - INFO - 发现政策文档: 北京市产业政策导引.pdf，开始加载...
+2025-07-28 09:35:23,620 - policy_matcher - INFO - 开始添加政策文档: 北京市产业政策导引.pdf
+2025-07-28 09:35:24,273 - document_processor - INFO - 开始处理文档: 北京市产业政策导引.pdf
+2025-07-28 09:35:33,660 - policy_matcher - ERROR - 添加政策文档失败: 'DocumentProcessor' object has no attribute 'money_pattern'
+2025-07-28 09:35:33,662 - __main__ - WARNING - 政策文档加载失败
+2025-07-28 09:35:33,662 - __main__ - INFO - 系统初始化完成
+2025-07-28 09:35:33,662 - __main__ - INFO - 开始测试查询...
+2025-07-28 09:35:33,662 - __main__ - INFO - 
+=== 测试自然语言查询功能 ===
+2025-07-28 09:35:33,662 - __main__ - INFO - 
+--- 测试 1: 生物医药行业政策查询 ---
+2025-07-28 09:35:33,662 - __main__ - INFO - 查询: 我想查找和生物医药相关的政策
+2025-07-28 09:35:33,663 - policy_matcher - ERROR - 自然语言查询失败: 'AdvancedRetriever' object has no attribute 'hybrid_search'
+2025-07-28 09:35:33,663 - __main__ - INFO - 查询结果: 找到 0 个匹配政策
+2025-07-28 09:35:33,664 - __main__ - INFO - 处理时间: 0.00秒
+2025-07-28 09:35:33,664 - __main__ - INFO - 建议:
+2025-07-28 09:35:33,664 - __main__ - INFO -   - 查询过程出现错误: 'AdvancedRetriever' object has no attribute 'hybrid_search'
+2025-07-28 09:35:33,664 - __main__ - INFO - 
+--- 测试 2: 初创企业政策查询 ---
+2025-07-28 09:35:33,664 - __main__ - INFO - 查询: 我是一家小型初创企业，现阶段有什么政策比较适用
+2025-07-28 09:35:33,664 - policy_matcher - ERROR - 自然语言查询失败: 'AdvancedRetriever' object has no attribute 'hybrid_search'
+2025-07-28 09:35:33,664 - __main__ - INFO - 查询结果: 找到 0 个匹配政策
+2025-07-28 09:35:33,664 - __main__ - INFO - 处理时间: 0.00秒
+2025-07-28 09:35:33,664 - __main__ - INFO - 建议:
+2025-07-28 09:35:33,664 - __main__ - INFO -   - 查询过程出现错误: 'AdvancedRetriever' object has no attribute 'hybrid_search'
+2025-07-28 09:35:33,664 - __main__ - INFO - 
+--- 测试 3: 创新资金政策查询 ---
+2025-07-28 09:35:33,664 - __main__ - INFO - 查询: 有哪些研发创新方面的资金支持政策
+2025-07-28 09:35:33,664 - policy_matcher - ERROR - 自然语言查询失败: 'AdvancedRetriever' object has no attribute 'hybrid_search'
+2025-07-28 09:35:33,664 - __main__ - INFO - 查询结果: 找到 0 个匹配政策
+2025-07-28 09:35:33,664 - __main__ - INFO - 处理时间: 0.00秒
+2025-07-28 09:35:33,664 - __main__ - INFO - 建议:
+2025-07-28 09:35:33,664 - __main__ - INFO -   - 查询过程出现错误: 'AdvancedRetriever' object has no attribute 'hybrid_search'
+2025-07-28 09:35:33,664 - __main__ - INFO - 
+=== 测试基础匹配功能 ===
+2025-07-28 09:35:33,664 - __main__ - INFO - 基础匹配参数: 行业=生物医药（含医疗器械）, 规模=初创企业（成立<3年，员工<20人）, 需求=资金补贴（如研发费用补助）
+2025-07-28 09:35:33,664 - __main__ - INFO - 基础匹配结果: 找到 3 个匹配政策
+2025-07-28 09:35:33,664 - __main__ - INFO - 处理时间: 0.00秒
+2025-07-28 09:35:33,664 - __main__ - INFO - 匹配类型: basic
+2025-07-28 09:35:33,664 - __main__ - INFO -   1. 生物医药产业发展支持政策
+2025-07-28 09:35:33,664 - __main__ - INFO -      匹配度: 高 (1.000)
+2025-07-28 09:35:33,664 - __main__ - INFO -      政策类型: 资金支持
+2025-07-28 09:35:33,664 - __main__ - INFO -      关键描述: 支持生物医药企业研发创新，提供最高500万元资金支持，适合初创企业申请...
+2025-07-28 09:35:33,664 - __main__ - INFO -   2. 企业研发费用加计扣除政策
+2025-07-28 09:35:33,664 - __main__ - INFO -      匹配度: 中 (0.770)
+2025-07-28 09:35:33,664 - __main__ - INFO -      政策类型: 税收优惠
+2025-07-28 09:35:33,664 - __main__ - INFO -      关键描述: 研发费用可享受175%加计扣除，有效降低企业税负，适合有研发投入的企业...
+2025-07-28 09:35:33,664 - __main__ - INFO -   3. 初创企业孵化器支持计划
+2025-07-28 09:35:33,664 - __main__ - INFO -      匹配度: 中 (0.690)
+2025-07-28 09:35:33,664 - __main__ - INFO -      政策类型: 空间支持
+2025-07-28 09:35:33,664 - __main__ - INFO -      关键描述: 为初创企业提供孵化空间和创业辅导，减免租金最高80%，提供专业服务...
+2025-07-28 09:35:33,665 - __main__ - INFO - 建议:
+2025-07-28 09:35:33,665 - __main__ - INFO -   - 建议使用精准匹配功能获得更准确的结果
+2025-07-28 09:35:33,665 - __main__ - INFO -   - 可以上传企业资料进行详细分析
+2025-07-28 09:35:33,665 - __main__ - INFO -   - 关注政策申请时间窗口
+2025-07-28 09:35:33,665 - __main__ - INFO - 
+=== 测试精准匹配功能 ===
+2025-07-28 09:35:33,665 - __main__ - ERROR - 精准匹配测试失败: 1 validation error for CompanyInfo
+registered_capital
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='500万元', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.8/v/float_parsing
+2025-07-28 09:35:33,665 - __main__ - INFO - 
+=== 启动FastAPI服务 ===
+2025-07-28 09:35:33,665 - __main__ - INFO - 服务地址: http://localhost:8000
+2025-07-28 09:35:33,665 - __main__ - INFO - API文档: http://localhost:8000/docs
+2025-07-28 09:35:33,665 - __main__ - INFO - 功能包括:
+2025-07-28 09:35:33,665 - __main__ - INFO -   - 自然语言查询: POST /search
+2025-07-28 09:35:33,665 - __main__ - INFO -   - 基础匹配: POST /basic-match
+2025-07-28 09:35:33,665 - __main__ - INFO -   - 精准匹配: POST /precise-match
+2025-07-28 09:35:33,665 - __main__ - INFO -   - 配置查询: GET /config
+2025-07-28 09:35:33,665 - __main__ - INFO -   - 健康检查: GET /health
