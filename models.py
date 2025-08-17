@@ -51,6 +51,11 @@ class PolicyDocument(BaseModel):
     source_url: Optional[str] = Field(None, description="来源链接")
     file_path: str = Field(..., description="文件路径")
     chunks: List[PolicyChunk] = Field(default_factory=list, description="文档分块")
+    
+    # 🆕 添加用于数据库关联的字段
+    original_filename: Optional[str] = Field(None, description="原始文件名")
+    document_number: Optional[str] = Field(None, description="发文字号")
+    issuing_agency: Optional[str] = Field(None, description="发文机构")
 
 # ======= 一键匹配相关数据模型 =======
 
@@ -106,6 +111,12 @@ class PolicyMatch(BaseModel):
     policy_type: str = Field(..., description="政策类型")
     support_content: str = Field(..., description="支持内容")
     application_conditions: str = Field(..., description="申请条件")
+    
+    # 🆕 添加用于数据库关联的字段
+    original_filename: Optional[str] = Field(None, description="原始文件名")
+    file_path: Optional[str] = Field(None, description="文件路径")
+    document_number: Optional[str] = Field(None, description="发文字号")
+    issuing_agency: Optional[str] = Field(None, description="发文机构")
 
 class OneClickMatchResponse(BaseModel):
     """一键匹配响应模型"""
@@ -226,6 +237,10 @@ class StructuredPolicy:
     # 完整内容
     full_content: Optional[str] = None
     chunks: Optional[List[PolicyChunk]] = None
+    
+    # 🆕 添加用于数据库关联的字段
+    original_filename: Optional[str] = None    # 原始文件名
+    file_path: Optional[str] = None            # 文件路径
 
 @dataclass
 class EnhancedRequirementStatus:
@@ -259,4 +274,10 @@ class PolicyEligibilityResponse(BaseModel):
     matching_score: Optional[float] = Field(None, description="整体匹配分数")
     feasibility_assessment: Optional[str] = Field(None, description="可行性评估")
     timeline_estimate: Optional[str] = Field(None, description="时间线估计")
-    risk_factors: Optional[List[str]] = Field(None, description="风险因素") 
+    risk_factors: Optional[List[str]] = Field(None, description="风险因素")
+    
+    # 🆕 添加用于数据库关联的字段
+    original_filename: Optional[str] = Field(None, description="原始文件名")
+    file_path: Optional[str] = Field(None, description="文件路径")
+    document_number: Optional[str] = Field(None, description="发文字号")
+    issuing_agency: Optional[str] = Field(None, description="发文机构") 

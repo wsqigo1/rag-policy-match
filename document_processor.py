@@ -203,6 +203,8 @@ class DocumentProcessor:
                     policy_id=Path(pdf_path).stem,
                     title=self._extract_title(full_text),
                     full_content=full_text,
+                    original_filename=Path(pdf_path).name,  # 添加原始文件名
+                    file_path=pdf_path,  # 添加文件路径
                     **structured_fields
                 )
                 
@@ -585,6 +587,9 @@ class DocumentProcessor:
         # 提取元数据
         metadata = self.extract_metadata(content, file_path)
         
+        # 提取结构化字段
+        structured_fields = self.extractor.extract_structured_fields(content)
+        
         # 分割文档
         chunks = self.split_into_chunks(content, policy_id, tables)
         
@@ -597,7 +602,11 @@ class DocumentProcessor:
             enterprise_scale=metadata['enterprise_scales'],
             policy_type=metadata['policy_types'][0] if metadata['policy_types'] else None,
             file_path=file_path,
-            chunks=chunks
+            chunks=chunks,
+            # 🆕 添加用于数据库关联的字段
+            original_filename=Path(file_path).name,  # 原始文件名（包含扩展名）
+            document_number=structured_fields.get('document_number'),
+            issuing_agency=structured_fields.get('issuing_agency')
         )
         
         logger.info(f"文档处理完成: {file_path}, 生成 {len(chunks)} 个分块")

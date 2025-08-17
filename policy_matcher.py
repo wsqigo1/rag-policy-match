@@ -505,7 +505,13 @@ class EnhancedPolicyMatcher:
                 matching_score=sum(field_scores.values()) / len(field_scores),
                 feasibility_assessment=self._assess_feasibility(pass_rate, risk_factors),
                 timeline_estimate=timeline_estimate,
-                risk_factors=risk_factors
+                risk_factors=risk_factors,
+                
+                # 🆕 添加用于数据库关联的字段
+                original_filename=getattr(structured_policy, 'original_filename', None),
+                file_path=getattr(structured_policy, 'file_path', None),
+                document_number=structured_policy.document_number,
+                issuing_agency=structured_policy.issuing_agency
             )
             
         except Exception as e:
@@ -705,18 +711,158 @@ class EnhancedPolicyMatcher:
         else:
             return "可行性较低，需要显著改善条件"
     
+    def _extract_policy_name(self, result) -> str:
+        """从检索结果中提取政策名称"""
+        # 尝试从内容中提取标题
+        content = result.content
+        lines = content.split('\n')
+        for line in lines[:5]:  # 检查前5行
+            line = line.strip()
+            if len(line) > 10 and not line.startswith(('第', '一、', '二、', '三、', '（')):
+                return line
+        # 如果没找到合适的标题，使用政策ID
+        return f"政策文档 {result.policy_id}"
+    
+    def _infer_policy_type(self, content: str) -> str:
+        """从内容推断政策类型"""
+        content_lower = content.lower()
+        if any(keyword in content_lower for keyword in ['资金', '补助', '补贴', '扶持']):
+            return "资金支持"
+        elif any(keyword in content_lower for keyword in ['认定', '资质', '高新', '专精特新']):
+            return "资质认定"
+        elif any(keyword in content_lower for keyword in ['人才', '落户', '住房']):
+            return "人才支持"
+        elif any(keyword in content_lower for keyword in ['税收', '减免', '优惠']):
+            return "税收优惠"
+        elif any(keyword in content_lower for keyword in ['空间', '租金', '实验室']):
+            return "空间支持"
+        else:
+            return "政策支持"
+    
+    def _extract_support_content(self, content: str) -> str:
+        """提取支持内容"""
+        # 寻找包含支持内容的段落
+        sentences = content.split('。')
+        for sentence in sentences:
+            if any(keyword in sentence for keyword in ['支持', '补助', '补贴', '扶持', '资助']):
+                return sentence.strip()[:100] + "..."
+        return "详见政策条文"
+    
+    def _extract_conditions(self, content: str) -> str:
+        """提取申请条件"""
+        sentences = content.split('。')
+        for sentence in sentences:
+            if any(keyword in sentence for keyword in ['条件', '要求', '应当', '必须', '需要']):
+                return sentence.strip()[:100] + "..."
+        return "详见政策条文"
+    
+    def _simple_vector_search(self, request) -> List:
+        """简单的同步向量搜索"""
+        from vector_store import VectorStore
+        from embeddings import EmbeddingManager
+        from models import RetrievalResult
+        
+        try:
+            # 初始化组件
+            vector_store = VectorStore()
+            embedding_manager = EmbeddingManager()
+            
+            if not vector_store.milvus.connected:
+                return []
+            
+            # 生成查询向量
+            query_embedding = embedding_manager.encode_texts([request.query])
+            
+            # 执行搜索
+            results = vector_store.milvus.search(query_embedding[0], top_k=request.top_k or 10)
+            
+            # 转换为RetrievalResult格式
+            retrieval_results = []
+            for result in results:
+                retrieval_results.append(RetrievalResult(
+                    chunk_id=result.chunk_id,
+                    content=result.content,
+                    score=float(result.score),
+                    policy_id=result.policy_id,
+                    metadata=result.metadata or {}
+                ))
+                
+            return retrieval_results
+            
+        except Exception as e:
+            logger.error(f"简单向量搜索失败: {e}")
+            return []
+    
     def basic_match(self, request: 'BasicMatchRequest') -> 'OneClickMatchResponse':
-        """基础匹配功能"""
+        """基础匹配功能 - 使用真实向量检索"""
         start_time = datetime.now()
         
         try:
-            from models import PolicyMatch, OneClickMatchResponse
+            from models import PolicyMatch, OneClickMatchResponse, QueryRequest
             
-            # 模拟基础匹配结果
+            # 🆕 构建查询文本，基于用户选择的条件
+            query_parts = []
+            if request.industry:
+                query_parts.append(request.industry)
+            if request.demand_type:
+                if "资金" in request.demand_type:
+                    query_parts.append("资金支持 补助 扶持")
+                elif "资质" in request.demand_type:
+                    query_parts.append("资质认定 高新企业 专精特新")
+                elif "人才" in request.demand_type:
+                    query_parts.append("人才支持 落户 住房补贴")
+                elif "空间" in request.demand_type:
+                    query_parts.append("空间支持 实验室 租金减免")
+            
+            # 企业规模相关关键词
+            if "初创" in request.company_scale:
+                query_parts.append("初创企业 小微企业")
+            elif "中小" in request.company_scale:
+                query_parts.append("中小企业")
+            elif "大型" in request.company_scale:
+                query_parts.append("大型企业")
+            
+            query_text = " ".join(query_parts) if query_parts else f"{request.industry} {request.demand_type}"
+            
+            # 🆕 使用向量检索替代模拟数据
+            query_request = QueryRequest(
+                query=query_text,
+                industry=request.industry,
+                enterprise_scale=request.company_scale,
+                top_k=10
+            )
+            
+            # 调用真实的查询系统
+            query_response = self.match_policies(query_request)
+            
+            # 将检索结果转换为PolicyMatch格式
             matches = []
+            for result in query_response.results[:10]:
+                # 从向量检索结果中提取政策信息
+                policy_name = self._extract_policy_name(result)
+                match_score = min(result.score * 1.2, 1.0)  # 调整分数范围
+                
+                matches.append(PolicyMatch(
+                    policy_id=result.policy_id,
+                    policy_name=policy_name,
+                    match_score=round(match_score, 2),
+                    match_level="高" if match_score >= 0.8 else "中" if match_score >= 0.6 else "低",
+                    key_description=result.content[:150] + "...",
+                    policy_type=self._infer_policy_type(result.content),
+                    support_content=self._extract_support_content(result.content),
+                    application_conditions=self._extract_conditions(result.content),
+                    # 使用真实的关联字段
+                    original_filename=getattr(result, 'original_filename', None),
+                    file_path=getattr(result, 'file_path', None),
+                    document_number=getattr(result, 'document_number', None),
+                    issuing_agency=getattr(result, 'issuing_agency', None)
+                ))
             
-            # 基于行业的简单匹配逻辑
-            mock_policies = [
+            # 如果向量检索没有结果，使用备用模拟数据
+            if not matches:
+                logger.warning("向量检索无结果，使用备用模拟数据")
+                # 保留原有的模拟数据作为备用
+                mock_policies = [
                 {
                     "policy_id": "policy_001",
                     "policy_name": "生物医药产业发展支持政策",
@@ -725,7 +871,12 @@ class EnhancedPolicyMatcher:
                     "key_description": "支持生物医药企业研发创新，提供最高500万元资金支持，适合初创企业申请",
                     "policy_type": "资金支持",
                     "support_content": "研发费用补助、设备购置支持",
-                    "application_conditions": "注册在中关村示范区，成立不超过3年"
+                    "application_conditions": "注册在中关村示范区，成立不超过3年",
+                    # 🆕 添加用于数据库关联的字段
+                    "original_filename": "生物医药产业发展支持政策.pdf",
+                    "file_path": "/policies/生物医药产业发展支持政策.pdf",
+                    "document_number": "京发改〔2023〕15号",
+                    "issuing_agency": "北京市发展和改革委员会"
                 },
                 {
                     "policy_id": "policy_002", 
@@ -735,7 +886,12 @@ class EnhancedPolicyMatcher:
                     "key_description": "为初创企业提供孵化空间和创业辅导，减免租金最高80%，提供专业服务",
                     "policy_type": "空间支持",
                     "support_content": "孵化空间、创业辅导、资源对接",
-                    "application_conditions": "成立不超过3年，员工少于20人"
+                    "application_conditions": "成立不超过3年，员工少于20人",
+                    # 🆕 添加用于数据库关联的字段
+                    "original_filename": "初创企业孵化器支持计划.pdf",
+                    "file_path": "/policies/初创企业孵化器支持计划.pdf",
+                    "document_number": "京科发〔2023〕8号",
+                    "issuing_agency": "北京市科学技术委员会"
                 },
                 {
                     "policy_id": "policy_003",
@@ -745,37 +901,47 @@ class EnhancedPolicyMatcher:
                     "key_description": "研发费用可享受175%加计扣除，有效降低企业税负，适合有研发投入的企业",
                     "policy_type": "税收优惠",
                     "support_content": "研发费用税前加计扣除",
-                    "application_conditions": "有研发活动和费用支出记录"
+                    "application_conditions": "有研发活动和费用支出记录",
+                    # 🆕 添加用于数据库关联的字段
+                    "original_filename": "企业研发费用加计扣除政策.docx",
+                    "file_path": "/policies/企业研发费用加计扣除政策.docx",
+                    "document_number": "财税〔2023〕28号",
+                    "issuing_agency": "财政部、税务总局"
                 }
             ]
             
-            # 根据请求参数过滤和评分
-            for policy in mock_policies:
-                # 行业匹配
-                industry_match = self._match_industry(request.industry, policy)
-                # 企业规模匹配
-                scale_match = self._match_scale(request.company_scale, policy)
-                # 需求类型匹配
-                demand_match = self._match_demand_type(request.demand_type, policy)
-                
-                # 综合评分
-                total_score = (industry_match * 0.4 + scale_match * 0.3 + demand_match * 0.3)
-                
-                if total_score >= 0.5:  # 匹配阈值
-                    match_level = "高" if total_score >= 0.8 else "中" if total_score >= 0.6 else "低"
+                # 根据请求参数过滤和评分（仅用于备用情况）
+                for policy in mock_policies:
+                    # 行业匹配
+                    industry_match = self._match_industry(request.industry, policy)
+                    # 企业规模匹配
+                    scale_match = self._match_scale(request.company_scale, policy)
+                    # 需求类型匹配
+                    demand_match = self._match_demand_type(request.demand_type, policy)
                     
-                    matches.append(PolicyMatch(
-                        policy_id=policy["policy_id"],
-                        policy_name=policy["policy_name"],
-                        match_score=round(total_score, 2),
-                        match_level=match_level,
-                        key_description=policy["key_description"],
-                        policy_type=policy["policy_type"],
-                        support_content=policy["support_content"],
-                        application_conditions=policy["application_conditions"]
-                    ))
+                    # 综合评分
+                    total_score = (industry_match * 0.4 + scale_match * 0.3 + demand_match * 0.3)
+                    
+                    if total_score >= 0.5:  # 匹配阈值
+                        match_level = "高" if total_score >= 0.8 else "中" if total_score >= 0.6 else "低"
+                        
+                        matches.append(PolicyMatch(
+                            policy_id=policy["policy_id"],
+                            policy_name=policy["policy_name"],
+                            match_score=round(total_score, 2),
+                            match_level=match_level,
+                            key_description=policy["key_description"],
+                            policy_type=policy["policy_type"],
+                            support_content=policy["support_content"],
+                            application_conditions=policy["application_conditions"],
+                            # 🆕 添加用于数据库关联的字段
+                            original_filename=policy.get("original_filename"),
+                            file_path=policy.get("file_path"),
+                            document_number=policy.get("document_number"),
+                            issuing_agency=policy.get("issuing_agency")
+                        ))
             
-            # 按匹配分数排序
+            # 按匹配分数排序（适用于所有情况）
             matches.sort(key=lambda x: x.match_score, reverse=True)
             
             processing_time = (datetime.now() - start_time).total_seconds()
@@ -837,7 +1003,12 @@ class EnhancedPolicyMatcher:
                     key_description=enhanced_description,
                     policy_type=match.policy_type,
                     support_content=match.support_content,
-                    application_conditions=match.application_conditions
+                    application_conditions=match.application_conditions,
+                    # 🆕 保留原有的关联字段
+                    original_filename=match.original_filename,
+                    file_path=match.file_path,
+                    document_number=match.document_number,
+                    issuing_agency=match.issuing_agency
                 ))
             
             # 重新排序
@@ -1030,8 +1201,8 @@ class EnhancedPolicyMatcher:
             policy_doc = processor.process_document(file_path)
             
             # 2. 生成向量嵌入
-            from embeddings import get_embedding_model
-            embedding_model = get_embedding_model()
+            from embeddings import EmbeddingManager
+            embedding_model = EmbeddingManager()
             
             # 提取所有分块的文本内容
             chunk_texts = [chunk.content for chunk in policy_doc.chunks]
@@ -1040,12 +1211,12 @@ class EnhancedPolicyMatcher:
                 return False
             
             # 生成嵌入向量
-            embeddings = embedding_model.encode(chunk_texts)
+            embeddings = embedding_model.encode_texts(chunk_texts)
             logger.info(f"向量编码完成，形状: {embeddings.shape}")
             
             # 3. 存储到向量数据库
-            from vector_store import get_vector_store
-            vector_store = get_vector_store()
+            from vector_store import VectorStore
+            vector_store = VectorStore()
             
             # 准备元数据
             policy_metadata = {
@@ -1389,24 +1560,23 @@ class EnhancedPolicyMatcher:
             if request.region:
                 filters['region'] = request.region
             
-            # 使用检索器进行搜索
+            # 🆕 使用同步向量检索
             try:
-                # 尝试使用高级检索
-                retrieval_results = self.retriever.search(
-                    query=request.query,
-                    filters=filters,
-                    top_k=request.top_k or 10
-                )
-            except AttributeError:
-                # 如果高级检索不可用，回退到基本搜索
-                logger.warning("高级检索不可用，使用基本搜索")
+                # 直接使用向量存储进行搜索
+                retrieval_results = self._simple_vector_search(request)
+                logger.info(f"检索到 {len(retrieval_results)} 个结果")
+            except Exception as e:
+                # 如果检索失败，回退到基本搜索
+                logger.warning(f"向量检索失败: {e}，使用基本搜索")
                 retrieval_results = []
             
-            # 如果没有找到结果，提供模拟结果
+            # 🆕 如果没有找到结果，提供模拟结果
             if not retrieval_results:
                 logger.info("未找到检索结果，提供模拟政策数据")
                 mock_results = self._get_mock_retrieval_results(request.query)
                 retrieval_results.extend(mock_results)
+            else:
+                logger.info(f"成功检索到 {len(retrieval_results)} 个真实政策结果")
             
             # 生成查询分析和建议
             query_analysis = {

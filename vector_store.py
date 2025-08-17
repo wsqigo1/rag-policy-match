@@ -121,37 +121,25 @@ class MilvusStore:
                         truncated = truncated[:-1]
                 return ""
             
-            # 构建实体列表（按行组织数据）
-            entities = []
-            for i, chunk in enumerate(chunks):
-                entity = [
-                    safe_truncate(chunk.chunk_id, 250),      # chunk_id (VARCHAR)
-                    safe_truncate(chunk.policy_id, 250),     # policy_id (VARCHAR)  
-                    safe_truncate(chunk.content, 1900),      # content (VARCHAR)
-                    safe_truncate(chunk.section or "", 250), # section (VARCHAR)
-                    safe_truncate(chunk.chunk_type, 60),     # chunk_type (VARCHAR)
-                    embeddings[i].tolist()                   # embedding (FLOAT_VECTOR)
-                ]
-                entities.append(entity)
+            # 构建数据列表（按列组织数据）- Milvus 2.x格式
+            data = [
+                [safe_truncate(chunk.chunk_id, 250) for chunk in chunks],      # chunk_id列
+                [safe_truncate(chunk.policy_id, 250) for chunk in chunks],     # policy_id列  
+                [safe_truncate(chunk.content, 1900) for chunk in chunks],      # content列
+                [safe_truncate(chunk.section or "", 250) for chunk in chunks], # section列
+                [safe_truncate(chunk.chunk_type, 60) for chunk in chunks],     # chunk_type列
+                [embeddings[i].tolist() for i in range(len(chunks))]           # embedding列
+            ]
             
             # 调试信息
             logger.info(f"准备插入数据: chunks数量={len(chunks)}, embeddings形状={embeddings.shape}")
-            logger.info(f"实体格式样例: {entities[0] if entities else []}")
+            logger.info(f"数据列表字段数: {len(data)}")
+            for i, field_data in enumerate(data):
+                field_name = self.collection.schema.fields[i].name
+                logger.info(f"字段 {field_name}: {len(field_data)} 条记录")
             
-            # 验证数据格式
-            if entities:
-                sample_entity = entities[0]
-                for i, field in enumerate(self.collection.schema.fields):
-                    field_name = field.name
-                    field_type = field.dtype
-                    sample_value = sample_entity[i]
-                    
-                    logger.info(f"验证字段 {field_name} (Milvus类型: {field_type}) - "
-                              f"样例值: {str(sample_value)[:100]}{'...' if len(str(sample_value)) > 100 else ''} - "
-                              f"Python类型: {type(sample_value)}")
-            
-            # 插入数据 - 使用实体列表格式
-            insert_result = self.collection.insert(entities)
+            # 插入数据 - 使用列表格式
+            insert_result = self.collection.insert(data)
 
             # 刷新
             self.collection.flush()
