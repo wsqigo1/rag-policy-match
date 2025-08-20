@@ -203,7 +203,7 @@ def main():
         # 使用subprocess启动服务，这样可以更好地控制进程
         process = subprocess.Popen([
             sys.executable, "api.py"
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         
         # 等待服务启动
         time.sleep(10)

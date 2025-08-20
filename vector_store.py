@@ -287,8 +287,7 @@ class ElasticsearchStore:
         """连接到Elasticsearch"""
         try:
             self.client = Elasticsearch(
-                hosts=[f"http://{config.ES_HOST}:{config.ES_PORT}"],
-                request_timeout=30
+                hosts=[f"http://{config.ES_HOST}:{config.ES_PORT}"]
             )
             
             # 测试连接
