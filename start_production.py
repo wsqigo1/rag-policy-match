@@ -71,11 +71,35 @@ def check_vector_store():
     try:
         from vector_store import get_vector_store
         vector_store = get_vector_store()
-        # 简单的连接测试
-        logger.info("向量存储服务连接正常")
-        return True
+        
+        # 检查Milvus连接
+        milvus_ok = vector_store.milvus.connected
+        # 检查Elasticsearch连接
+        es_ok = vector_store.elasticsearch.connected
+        
+        if milvus_ok:
+            logger.info("✅ Milvus 连接正常")
+        else:
+            logger.warning("⚠️  Milvus 连接失败")
+            
+        if es_ok:
+            logger.info("✅ Elasticsearch 连接正常")
+        else:
+            logger.warning("⚠️  Elasticsearch 连接失败")
+        
+        # 至少有一个服务可用就算成功
+        if milvus_ok or es_ok:
+            logger.info("向量存储服务部分可用")
+            return True
+        else:
+            logger.warning("所有向量存储服务都不可用")
+            return False
+            
     except Exception as e:
         logger.warning(f"向量存储服务检查失败: {e}")
+        # 打印更详细的错误信息用于诊断
+        import traceback
+        logger.debug(f"详细错误信息: {traceback.format_exc()}")
         return False
 
 def wait_for_service(url, service_name, timeout=30):
@@ -180,9 +204,12 @@ def main():
         logger.error("依赖检查失败，启动终止")
         sys.exit(1)
     
-    # 2. 检查向量存储
-    if not check_vector_store():
-        logger.warning("向量存储服务不可用，部分功能可能受限")
+    # 2. 检查向量存储 - 严格模式：失败则退出
+    vector_store_ok = check_vector_store()
+    if not vector_store_ok:
+        logger.error("向量存储服务检查失败，系统启动终止")
+        logger.error("请确保 Milvus 和 Elasticsearch 服务正常运行")
+        sys.exit(1)
     
     print("\n📋 服务配置:")
     print("  - 统一API服务: http://localhost:8000")
