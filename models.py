@@ -280,4 +280,69 @@ class PolicyEligibilityResponse(BaseModel):
     original_filename: Optional[str] = Field(None, description="原始文件名")
     file_path: Optional[str] = Field(None, description="文件路径")
     document_number: Optional[str] = Field(None, description="发文字号")
-    issuing_agency: Optional[str] = Field(None, description="发文机构") 
+    issuing_agency: Optional[str] = Field(None, description="发文机构")
+
+# ======= 企业发展数据政策匹配相关数据模型 =======
+
+class CompanyDevelopmentDataRequest(BaseModel):
+    """普遍企业发展数据政策匹配请求模型"""
+    company_name: str = Field(..., description="企业名称")
+    report_period: int = Field(..., description="填报周期，格式为YYYYMM")
+    industrial_output: float = Field(..., description="工业总产值（千元）", ge=0)
+    total_income: float = Field(..., description="总收入(千元)", ge=0)
+    tech_income: float = Field(..., description="技术收入(千元)", ge=0)
+    tax_payment: float = Field(..., description="实缴税费总额(千元)", ge=0)
+    profit_total: float = Field(..., description="利润总额(千元)")
+    export_total: float = Field(..., description="出口总额(千元)", ge=0)
+    rd_personnel_count: int = Field(..., description="研究开发人员合计(人)", ge=0)
+    rd_expense: float = Field(..., description="研究开发费用合计(千元)", ge=0)
+    valid_patent_count: int = Field(..., description="拥有有效专利数（个）", ge=0)
+    valid_invention_patent_count: int = Field(..., description="有效发明专利数（个）", ge=0)
+    employee_count: int = Field(..., description="从业人员数（人）", ge=1)
+
+class MajorEnterpriseDataRequest(BaseModel):
+    """规上企业发展数据政策匹配请求模型"""
+    company_name: str = Field(..., description="企业名称")
+    report_period: int = Field(..., description="填报周期，格式为YYYYMM")
+    total_income: float = Field(..., description="总收入(万元)", ge=0)
+    industrial_output: float = Field(..., description="工业总产值(万元)", ge=0)
+    tax_payment: float = Field(..., description="实缴税费(万元)", ge=0)
+    profit_total: float = Field(..., description="利润总额(万元)")
+    export_total: float = Field(..., description="出口总额(万元)", ge=0)
+    rd_expense: float = Field(..., description="研发费用(万元)", ge=0)
+    employee_count: int = Field(..., description="从业人员(人)", ge=1)
+    rd_personnel_count: int = Field(..., description="研发人员(人)", ge=0)
+
+class DevelopmentDataMatch(BaseModel):
+    """企业发展数据政策匹配结果模型"""
+    policy_id: str = Field(..., description="政策ID")
+    policy_name: str = Field(..., description="政策名称")
+    match_score: float = Field(..., description="匹配分数 0-1", ge=0, le=1)
+    match_level: str = Field(..., description="匹配度等级：高/中/低")
+    policy_type: str = Field(..., description="政策类型")
+    support_content: str = Field(..., description="支持内容")
+    key_requirements: List[str] = Field(default_factory=list, description="关键要求")
+    matching_indicators: Dict[str, Any] = Field(default_factory=dict, description="匹配指标分析")
+    feasibility_analysis: str = Field(..., description="可行性分析")
+    application_priority: str = Field(..., description="申请优先级：高/中/低")
+
+    # 继承自PolicyMatch的字段以保持兼容性
+    original_filename: Optional[str] = Field(None, description="原始文件名")
+    file_path: Optional[str] = Field(None, description="文件路径")
+    document_number: Optional[str] = Field(None, description="发文字号")
+    issuing_agency: Optional[str] = Field(None, description="发文机构")
+
+class DevelopmentDataMatchResponse(BaseModel):
+    """企业发展数据政策匹配响应模型"""
+    company_name: str = Field(..., description="企业名称")
+    report_period: int = Field(..., description="填报周期")
+    total_results: int = Field(..., description="匹配结果总数")
+    matches: List[DevelopmentDataMatch] = Field(..., description="匹配结果列表")
+    processing_time: float = Field(..., description="处理时间(秒)")
+    match_type: str = Field(..., description="匹配类型：development_data")
+
+    # 企业数据分析概览
+    company_analysis: Dict[str, Any] = Field(default_factory=dict, description="企业数据分析概览")
+    strengths: List[str] = Field(default_factory=list, description="企业优势")
+    improvement_areas: List[str] = Field(default_factory=list, description="改进领域")
+    recommendations: List[str] = Field(default_factory=list, description="政策申请建议")

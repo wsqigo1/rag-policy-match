@@ -1710,6 +1710,683 @@ class EnhancedPolicyMatcher:
             logger.error(f"生成模拟检索结果失败: {e}")
             return []
 
+    def company_development_match(self, request) -> 'DevelopmentDataMatchResponse':
+        """普遍企业发展数据政策匹配"""
+        start_time = datetime.now()
+
+        try:
+            from models import DevelopmentDataMatchResponse, DevelopmentDataMatch
+
+            logger.info(f"开始普遍企业发展数据政策匹配: 企业={request.company_name}")
+
+            # 1. 分析企业数据特征
+            company_analysis = self._analyze_company_development_data(request, is_major=False)
+
+            # 2. 基于数据特征匹配政策
+            matches = self._match_development_policies(request, company_analysis, is_major=False)
+
+            # 3. 生成企业优势和改进建议
+            strengths = self._identify_company_strengths(request, company_analysis, is_major=False)
+            improvement_areas = self._identify_improvement_areas(request, company_analysis, is_major=False)
+            recommendations = self._generate_development_recommendations(request, matches, is_major=False)
+
+            processing_time = (datetime.now() - start_time).total_seconds()
+
+            return DevelopmentDataMatchResponse(
+                company_name=request.company_name,
+                report_period=request.report_period,
+                total_results=len(matches),
+                matches=matches,
+                processing_time=processing_time,
+                match_type="development_data",
+                company_analysis=company_analysis,
+                strengths=strengths,
+                improvement_areas=improvement_areas,
+                recommendations=recommendations
+            )
+
+        except Exception as e:
+            logger.error(f"普遍企业发展数据政策匹配失败: {e}")
+            processing_time = (datetime.now() - start_time).total_seconds()
+            from models import DevelopmentDataMatchResponse
+            return DevelopmentDataMatchResponse(
+                company_name=request.company_name,
+                report_period=request.report_period,
+                total_results=0,
+                matches=[],
+                processing_time=processing_time,
+                match_type="development_data",
+                company_analysis={},
+                strengths=[],
+                improvement_areas=[f"数据分析过程出现错误: {str(e)}"],
+                recommendations=["请稍后重试或联系系统管理员"]
+            )
+
+    def major_enterprise_match(self, request) -> 'DevelopmentDataMatchResponse':
+        """规上企业发展数据政策匹配"""
+        start_time = datetime.now()
+
+        try:
+            from models import DevelopmentDataMatchResponse, DevelopmentDataMatch
+
+            logger.info(f"开始规上企业发展数据政策匹配: 企业={request.company_name}")
+
+            # 1. 分析企业数据特征（规上企业）
+            company_analysis = self._analyze_company_development_data(request, is_major=True)
+
+            # 2. 基于数据特征匹配政策
+            matches = self._match_development_policies(request, company_analysis, is_major=True)
+
+            # 3. 生成企业优势和改进建议
+            strengths = self._identify_company_strengths(request, company_analysis, is_major=True)
+            improvement_areas = self._identify_improvement_areas(request, company_analysis, is_major=True)
+            recommendations = self._generate_development_recommendations(request, matches, is_major=True)
+
+            processing_time = (datetime.now() - start_time).total_seconds()
+
+            return DevelopmentDataMatchResponse(
+                company_name=request.company_name,
+                report_period=request.report_period,
+                total_results=len(matches),
+                matches=matches,
+                processing_time=processing_time,
+                match_type="development_data",
+                company_analysis=company_analysis,
+                strengths=strengths,
+                improvement_areas=improvement_areas,
+                recommendations=recommendations
+            )
+
+        except Exception as e:
+            logger.error(f"规上企业发展数据政策匹配失败: {e}")
+            processing_time = (datetime.now() - start_time).total_seconds()
+            from models import DevelopmentDataMatchResponse
+            return DevelopmentDataMatchResponse(
+                company_name=request.company_name,
+                report_period=request.report_period,
+                total_results=0,
+                matches=[],
+                processing_time=processing_time,
+                match_type="development_data",
+                company_analysis={},
+                strengths=[],
+                improvement_areas=[f"数据分析过程出现错误: {str(e)}"],
+                recommendations=["请稍后重试或联系系统管理员"]
+            )
+
+    def _analyze_company_development_data(self, request, is_major: bool) -> Dict[str, Any]:
+        """分析企业发展数据特征"""
+        analysis = {}
+
+        if is_major:
+            # 规上企业数据分析
+            total_income = request.total_income  # 万元
+            rd_expense = request.rd_expense  # 万元
+            employee_count = request.employee_count
+            rd_personnel_count = request.rd_personnel_count
+
+            # 转换为千元单位以便统一计算
+            total_income_k = total_income * 10  # 万元转千元
+            rd_expense_k = rd_expense * 10
+
+            analysis.update({
+                "enterprise_scale": "规上企业",
+                "total_income": total_income_k,
+                "rd_expense": rd_expense_k,
+                "employee_count": employee_count,
+                "rd_personnel_count": rd_personnel_count
+            })
+        else:
+            # 普遍企业数据分析
+            total_income = request.total_income  # 千元
+            tech_income = request.tech_income
+            rd_expense = request.rd_expense  # 千元
+            employee_count = request.employee_count
+            rd_personnel_count = request.rd_personnel_count
+            valid_patent_count = request.valid_patent_count
+            valid_invention_patent_count = request.valid_invention_patent_count
+
+            analysis.update({
+                "enterprise_scale": self._determine_enterprise_scale(total_income / 10, employee_count),  # 转万元
+                "total_income": total_income,
+                "tech_income": tech_income,
+                "rd_expense": rd_expense,
+                "employee_count": employee_count,
+                "rd_personnel_count": rd_personnel_count,
+                "valid_patent_count": valid_patent_count,
+                "valid_invention_patent_count": valid_invention_patent_count
+            })
+
+        # 计算关键指标
+        if total_income > 0:
+            rd_ratio = (rd_expense_k if is_major else rd_expense) / (total_income_k if is_major else total_income) * 100
+        else:
+            rd_ratio = 0
+
+        rd_personnel_ratio = (rd_personnel_count / employee_count * 100) if employee_count > 0 else 0
+
+        if not is_major:
+            tech_income_ratio = (tech_income / total_income * 100) if total_income > 0 else 0
+            patent_density = valid_patent_count / employee_count if employee_count > 0 else 0
+            analysis.update({
+                "tech_income_ratio": tech_income_ratio,
+                "patent_density": patent_density,
+                "innovation_capability": self._assess_innovation_capability(
+                    rd_ratio, tech_income_ratio, valid_patent_count, valid_invention_patent_count
+                )
+            })
+
+        analysis.update({
+            "rd_intensity": rd_ratio,
+            "rd_personnel_ratio": rd_personnel_ratio,
+            "financial_capability": self._assess_financial_capability(
+                total_income_k if is_major else total_income, is_major
+            ),
+            "rd_capability": self._assess_rd_capability(rd_expense_k if is_major else rd_expense, rd_personnel_count)
+        })
+
+        return analysis
+
+    def _determine_enterprise_scale(self, annual_revenue_wan: float, employees: int) -> str:
+        """判断企业规模"""
+        if annual_revenue_wan >= 20000 or employees >= 300:
+            return "大型企业"
+        elif annual_revenue_wan >= 2000 or employees >= 100:
+            return "中型企业"
+        elif annual_revenue_wan >= 300 or employees >= 20:
+            return "小型企业"
+        else:
+            return "微型企业"
+
+    def _assess_innovation_capability(self, rd_ratio: float, tech_ratio: float,
+                                      patents: int, invention_patents: int) -> str:
+        """评估创新能力"""
+        score = 0
+        if rd_ratio >= 3:
+            score += 3
+        elif rd_ratio >= 1:
+            score += 2
+        elif rd_ratio > 0:
+            score += 1
+
+        if tech_ratio >= 60:
+            score += 3
+        elif tech_ratio >= 30:
+            score += 2
+        elif tech_ratio > 0:
+            score += 1
+
+        if patents >= 10:
+            score += 2
+        elif patents >= 3:
+            score += 1
+
+        if invention_patents >= 5:
+            score += 2
+        elif invention_patents >= 1:
+            score += 1
+
+        if score >= 8:
+            return "高"
+        elif score >= 5:
+            return "中"
+        else:
+            return "低"
+
+    def _assess_financial_capability(self, revenue: float, is_major: bool) -> str:
+        """评估财务能力"""
+        # 根据收入规模评估财务能力
+        if is_major:
+            # 规上企业标准（万元）
+            revenue_wan = revenue / 10
+            if revenue_wan >= 50000:
+                return "强"
+            elif revenue_wan >= 10000:
+                return "中"
+            else:
+                return "一般"
+        else:
+            # 普通企业标准（千元）
+            if revenue >= 50000:
+                return "强"
+            elif revenue >= 10000:
+                return "中"
+            else:
+                return "一般"
+
+    def _assess_rd_capability(self, rd_expense: float, rd_personnel: int) -> str:
+        """评估研发能力"""
+        score = 0
+        if rd_expense >= 1000:  # 千元
+            score += 2
+        elif rd_expense >= 500:
+            score += 1
+
+        if rd_personnel >= 10:
+            score += 2
+        elif rd_personnel >= 5:
+            score += 1
+        elif rd_personnel >= 1:
+            score += 0.5
+
+        if score >= 3:
+            return "强"
+        elif score >= 1.5:
+            return "中"
+        else:
+            return "弱"
+
+    def _match_development_policies(self, request, analysis: Dict, is_major: bool) -> List:
+        """基于企业发展数据匹配政策"""
+        from models import DevelopmentDataMatch
+
+        matches = []
+
+        # 获取企业关键特征
+        rd_intensity = analysis.get("rd_intensity", 0)
+        employee_count = analysis.get("employee_count", 0)
+        financial_capability = analysis.get("financial_capability", "一般")
+        rd_capability = analysis.get("rd_capability", "弱")
+
+        # 定义政策库（基于企业数据特征）
+        policy_database = self._get_development_policy_database(is_major)
+
+        for policy in policy_database:
+            # 计算匹配分数
+            match_score = self._calculate_development_match_score(
+                policy, request, analysis, is_major
+            )
+
+            if match_score >= 0.3:  # 匹配阈值
+                # 生成匹配指标分析
+                matching_indicators = self._analyze_matching_indicators(
+                    policy, request, analysis, is_major
+                )
+
+                # 生成可行性分析
+                feasibility = self._analyze_policy_feasibility(
+                    policy, request, analysis, match_score
+                )
+
+                # 确定申请优先级
+                priority = self._determine_application_priority(match_score, policy)
+
+                match = DevelopmentDataMatch(
+                    policy_id=policy["policy_id"],
+                    policy_name=policy["policy_name"],
+                    match_score=round(match_score, 3),
+                    match_level="高" if match_score >= 0.8 else "中" if match_score >= 0.6 else "低",
+                    policy_type=policy["policy_type"],
+                    support_content=policy["support_content"],
+                    key_requirements=policy["key_requirements"],
+                    matching_indicators=matching_indicators,
+                    feasibility_analysis=feasibility,
+                    application_priority=priority,
+                    original_filename=policy.get("original_filename"),
+                    file_path=policy.get("file_path"),
+                    document_number=policy.get("document_number"),
+                    issuing_agency=policy.get("issuing_agency")
+                )
+                matches.append(match)
+
+        # 按匹配分数排序
+        matches.sort(key=lambda x: x.match_score, reverse=True)
+        return matches
+
+    def _get_development_policy_database(self, is_major: bool) -> List[Dict]:
+        """获取发展政策数据库"""
+        if is_major:
+            # 规上企业政策库
+            return [
+                {
+                    "policy_id": "major_rd_001",
+                    "policy_name": "规模以上企业研发费用补助政策",
+                    "policy_type": "资金支持",
+                    "support_content": "按研发费用的10-30%给予补助，最高500万元",
+                    "key_requirements": ["规上企业", "年研发费用≥100万元", "研发人员≥10人"],
+                    "min_rd_expense": 1000,  # 万元
+                    "min_employee": 50,
+                    "target_industries": ["制造业", "高新技术", "科技服务"],
+                    "original_filename": "规上企业研发补助政策.pdf",
+                    "document_number": "京经信发〔2024〕15号",
+                    "issuing_agency": "北京市经济和信息化局"
+                },
+                {
+                    "policy_id": "major_export_001",
+                    "policy_name": "出口企业国际市场开拓支持政策",
+                    "policy_type": "资金支持",
+                    "support_content": "出口展会费用补贴、市场推广支持",
+                    "key_requirements": ["有出口业务", "年出口额≥200万元"],
+                    "min_export": 200,  # 万元
+                    "original_filename": "出口企业支持政策.pdf",
+                    "document_number": "京商务发〔2024〕8号",
+                    "issuing_agency": "北京市商务局"
+                },
+                {
+                    "policy_id": "major_tax_001",
+                    "policy_name": "规上企业研发费用加计扣除政策",
+                    "policy_type": "税收优惠",
+                    "support_content": "研发费用享受200%加计扣除",
+                    "key_requirements": ["规上企业", "有研发投入"],
+                    "min_rd_expense": 50,  # 万元
+                    "original_filename": "研发费用加计扣除政策.pdf",
+                    "document_number": "财税〔2024〕28号",
+                    "issuing_agency": "财政部、税务总局"
+                }
+            ]
+        else:
+            # 普通企业政策库
+            return [
+                {
+                    "policy_id": "general_innovation_001",
+                    "policy_name": "中小企业技术创新支持政策",
+                    "policy_type": "资金支持",
+                    "support_content": "技术创新项目资助，最高100万元",
+                    "key_requirements": ["中小企业", "有技术创新项目", "拥有知识产权"],
+                    "min_tech_income": 100,  # 千元
+                    "min_patents": 1,
+                    "original_filename": "中小企业创新支持政策.pdf",
+                    "document_number": "京科委发〔2024〕12号",
+                    "issuing_agency": "北京市科学技术委员会"
+                },
+                {
+                    "policy_id": "general_rd_001",
+                    "policy_name": "企业研发投入激励政策",
+                    "policy_type": "资金支持",
+                    "support_content": "研发费用按比例补贴，最高50万元",
+                    "key_requirements": ["年研发费用≥20万元", "研发人员≥5人"],
+                    "min_rd_expense": 200,  # 千元
+                    "min_rd_personnel": 5,
+                    "original_filename": "企业研发激励政策.pdf",
+                    "document_number": "京发改〔2024〕20号",
+                    "issuing_agency": "北京市发展改革委"
+                },
+                {
+                    "policy_id": "general_patent_001",
+                    "policy_name": "知识产权创造运用促进政策",
+                    "policy_type": "资金支持",
+                    "support_content": "专利申请费用补贴、专利转化奖励",
+                    "key_requirements": ["拥有有效专利", "专利转化应用"],
+                    "min_patents": 3,
+                    "min_invention_patents": 1,
+                    "original_filename": "知识产权促进政策.pdf",
+                    "document_number": "京知产发〔2024〕6号",
+                    "issuing_agency": "北京市知识产权局"
+                },
+                {
+                    "policy_id": "general_startup_001",
+                    "policy_name": "小微企业创业扶持政策",
+                    "policy_type": "综合支持",
+                    "support_content": "创业补贴、场地支持、培训服务",
+                    "key_requirements": ["小微企业", "成立3年内", "员工<50人"],
+                    "max_employee": 50,
+                    "max_revenue": 5000,  # 千元
+                    "original_filename": "小微企业扶持政策.pdf",
+                    "document_number": "京人社发〔2024〕18号",
+                    "issuing_agency": "北京市人力社保局"
+                }
+            ]
+
+    def _calculate_development_match_score(self, policy: Dict, request, analysis: Dict, is_major: bool) -> float:
+        """计算发展政策匹配分数"""
+        score = 0.5  # 基础分数
+
+        # 企业规模匹配
+        if is_major:
+            # 规上企业匹配
+            total_income = request.total_income  # 万元
+            rd_expense = request.rd_expense  # 万元
+
+            # 研发费用门槛
+            if "min_rd_expense" in policy and rd_expense >= policy["min_rd_expense"]:
+                score += 0.2
+
+            # 出口业务匹配
+            if "min_export" in policy and hasattr(request, 'export_total'):
+                if request.export_total >= policy["min_export"] * 10:  # 转千元
+                    score += 0.15
+
+        else:
+            # 普通企业匹配
+            total_income = request.total_income  # 千元
+            tech_income = request.tech_income
+            rd_expense = request.rd_expense
+            patent_count = request.valid_patent_count
+            invention_patents = request.valid_invention_patent_count
+
+            # 技术收入门槛
+            if "min_tech_income" in policy and tech_income >= policy["min_tech_income"]:
+                score += 0.15
+
+            # 研发费用门槛
+            if "min_rd_expense" in policy and rd_expense >= policy["min_rd_expense"]:
+                score += 0.2
+
+            # 专利门槛
+            if "min_patents" in policy and patent_count >= policy["min_patents"]:
+                score += 0.1
+
+            if "min_invention_patents" in policy and invention_patents >= policy["min_invention_patents"]:
+                score += 0.1
+
+            # 企业规模匹配
+            if "max_employee" in policy and request.employee_count <= policy["max_employee"]:
+                score += 0.1
+
+            if "max_revenue" in policy and total_income <= policy["max_revenue"]:
+                score += 0.1
+
+        # 研发人员匹配
+        if "min_rd_personnel" in policy and request.rd_personnel_count >= policy["min_rd_personnel"]:
+            score += 0.1
+
+        # 基于企业分析调整分数
+        financial_capability = analysis.get("financial_capability", "一般")
+        rd_capability = analysis.get("rd_capability", "弱")
+
+        if financial_capability == "强":
+            score += 0.1
+        elif financial_capability == "中":
+            score += 0.05
+
+        if rd_capability == "强":
+            score += 0.1
+        elif rd_capability == "中":
+            score += 0.05
+
+        return min(score, 1.0)
+
+    def _analyze_matching_indicators(self, policy: Dict, request, analysis: Dict, is_major: bool) -> Dict[str, Any]:
+        """分析匹配指标"""
+        indicators = {}
+
+        if is_major:
+            indicators.update({
+                "研发强度": f"{analysis.get('rd_intensity', 0):.1f}%",
+                "研发人员比例": f"{analysis.get('rd_personnel_ratio', 0):.1f}%",
+                "总收入": f"{request.total_income}万元",
+                "研发费用": f"{request.rd_expense}万元"
+            })
+
+            if hasattr(request, 'export_total') and request.export_total > 0:
+                indicators["出口业务"] = f"{request.export_total}万元"
+        else:
+            indicators.update({
+                "研发强度": f"{analysis.get('rd_intensity', 0):.1f}%",
+                "技术收入占比": f"{analysis.get('tech_income_ratio', 0):.1f}%",
+                "专利密度": f"{analysis.get('patent_density', 0):.3f}件/人",
+                "创新能力": analysis.get('innovation_capability', '低'),
+                "有效专利": f"{request.valid_patent_count}件",
+                "发明专利": f"{request.valid_invention_patent_count}件"
+            })
+
+        return indicators
+
+    def _analyze_policy_feasibility(self, policy: Dict, request, analysis: Dict, match_score: float) -> str:
+        """分析政策可行性"""
+        if match_score >= 0.8:
+            return f"高度匹配{policy['policy_name']}，建议优先申请。企业条件符合政策要求，申请成功率较高。"
+        elif match_score >= 0.6:
+            return f"较好匹配{policy['policy_name']}，建议准备申请材料。需要进一步完善部分申请条件。"
+        else:
+            return f"部分匹配{policy['policy_name']}，可考虑申请。建议先提升企业相关指标后再申请。"
+
+    def _determine_application_priority(self, match_score: float, policy: Dict) -> str:
+        """确定申请优先级"""
+        if match_score >= 0.8:
+            return "高"
+        elif match_score >= 0.6:
+            return "中"
+        else:
+            return "低"
+
+    def _identify_company_strengths(self, request, analysis: Dict, is_major: bool) -> List[str]:
+        """识别企业优势"""
+        strengths = []
+
+        # 通用优势分析
+        rd_intensity = analysis.get("rd_intensity", 0)
+        if rd_intensity >= 5:
+            strengths.append(f"研发投入强度高（{rd_intensity:.1f}%），体现了企业对技术创新的重视")
+        elif rd_intensity >= 2:
+            strengths.append(f"具有一定的研发投入（{rd_intensity:.1f}%），为技术创新提供保障")
+
+        rd_personnel_ratio = analysis.get("rd_personnel_ratio", 0)
+        if rd_personnel_ratio >= 15:
+            strengths.append(f"研发人员占比较高（{rd_personnel_ratio:.1f}%），技术人才储备充足")
+        elif rd_personnel_ratio >= 10:
+            strengths.append(f"拥有稳定的研发团队（{rd_personnel_ratio:.1f}%）")
+
+        financial_capability = analysis.get("financial_capability", "一般")
+        if financial_capability == "强":
+            strengths.append("财务状况良好，具备承担研发投入的经济实力")
+        elif financial_capability == "中":
+            strengths.append("财务状况稳定，为企业发展提供基础支撑")
+
+        if not is_major:
+            # 普通企业特有优势
+            tech_income_ratio = analysis.get("tech_income_ratio", 0)
+            if tech_income_ratio >= 60:
+                strengths.append(f"高新技术收入占比高（{tech_income_ratio:.1f}%），技术产业化能力强")
+            elif tech_income_ratio >= 30:
+                strengths.append(f"技术收入占比较好（{tech_income_ratio:.1f}%），具有技术转化优势")
+
+            if request.valid_patent_count >= 10:
+                strengths.append(f"拥有丰富的知识产权（{request.valid_patent_count}件专利），创新成果突出")
+            elif request.valid_patent_count >= 3:
+                strengths.append(f"具备一定的知识产权积累（{request.valid_patent_count}件专利）")
+
+            if request.valid_invention_patent_count >= 5:
+                strengths.append(f"发明专利数量较多（{request.valid_invention_patent_count}件），创新质量高")
+            elif request.valid_invention_patent_count >= 1:
+                strengths.append(f"拥有发明专利（{request.valid_invention_patent_count}件），体现技术创新实力")
+        else:
+            # 规上企业特有优势
+            if request.export_total > 0:
+                strengths.append(f"具有出口业务（{request.export_total}万元），国际市场拓展能力较好")
+
+            if request.total_income >= 10000:
+                strengths.append("企业规模较大，产业化能力和市场影响力强")
+
+        if not strengths:
+            strengths.append("企业正在发展阶段，具有提升潜力")
+
+        return strengths
+
+    def _identify_improvement_areas(self, request, analysis: Dict, is_major: bool) -> List[str]:
+        """识别改进领域"""
+        improvements = []
+
+        # 通用改进建议
+        rd_intensity = analysis.get("rd_intensity", 0)
+        if rd_intensity < 2:
+            improvements.append("建议增加研发投入，提高研发费用占营收比例（目前{:.1f}%）".format(rd_intensity))
+
+        rd_personnel_ratio = analysis.get("rd_personnel_ratio", 0)
+        if rd_personnel_ratio < 10:
+            improvements.append("建议扩充研发团队，提高研发人员占比（目前{:.1f}%）".format(rd_personnel_ratio))
+
+        if not is_major:
+            # 普通企业改进建议
+            tech_income_ratio = analysis.get("tech_income_ratio", 0)
+            if tech_income_ratio < 30:
+                improvements.append("建议提高技术收入占比，加强技术成果产业化（目前{:.1f}%）".format(tech_income_ratio))
+
+            if request.valid_patent_count == 0:
+                improvements.append("建议加强知识产权申请，建立专利保护体系")
+            elif request.valid_patent_count < 3:
+                improvements.append("建议继续增加专利申请，提升知识产权竞争力")
+
+            if request.valid_invention_patent_count == 0:
+                improvements.append("建议申请发明专利，提升技术创新层次")
+        else:
+            # 规上企业改进建议
+            if request.export_total == 0:
+                improvements.append("建议开拓国际市场，发展出口业务")
+            elif request.export_total < 1000:
+                improvements.append("建议扩大出口规模，提升国际竞争力")
+
+        financial_capability = analysis.get("financial_capability", "一般")
+        if financial_capability == "一般":
+            improvements.append("建议优化财务结构，提高盈利能力和现金流管理")
+
+        if not improvements:
+            improvements.append("企业发展状况良好，建议继续保持并适度扩大投入规模")
+
+        return improvements
+
+    def _generate_development_recommendations(self, request, matches: List, is_major: bool) -> List[str]:
+        """生成发展建议"""
+        recommendations = []
+
+        if not matches:
+            recommendations.extend([
+                "当前企业条件未找到完全匹配的政策，建议：",
+                "1. 优先提升研发投入和技术创新能力",
+                "2. 关注政策动态，等待更适合的政策机会",
+                "3. 咨询专业机构获得个性化指导"
+            ])
+            return recommendations
+
+        high_match_count = len([m for m in matches if m.match_level == "高"])
+        medium_match_count = len([m for m in matches if m.match_level == "中"])
+
+        if high_match_count > 0:
+            recommendations.append(f"发现{high_match_count}个高匹配政策，建议优先申请")
+            # 推荐前3个高匹配政策
+            high_matches = [m for m in matches if m.match_level == "高"][:3]
+            for i, match in enumerate(high_matches, 1):
+                recommendations.append(f"{i}. 优先申请：{match.policy_name}")
+
+        if medium_match_count > 0:
+            recommendations.append(f"另有{medium_match_count}个中等匹配政策可考虑申请")
+
+        # 基于企业类型的建议
+        if is_major:
+            recommendations.extend([
+                "规上企业专项建议：",
+                "1. 充分利用规模优势，申请大额度政策支持",
+                "2. 重点关注研发费用补助和税收优惠政策",
+                "3. 如有出口业务，积极申请国际市场开拓支持"
+            ])
+        else:
+            recommendations.extend([
+                "中小企业专项建议：",
+                "1. 重点关注门槛较低、支持力度大的创新政策",
+                "2. 加强知识产权保护，提升政策申请竞争力",
+                "3. 考虑联合申请或通过服务机构代理申请"
+            ])
+
+        recommendations.extend([
+            "申请注意事项：",
+            "1. 提前准备申请材料，关注申请截止时间",
+            "2. 确保企业数据真实准确，避免申请风险",
+            "3. 跟踪政策执行情况，及时补充完善材料"
+        ])
+
+        return recommendations
+
+
 # 延迟创建全局政策匹配引擎实例
 _policy_matcher = None
 
