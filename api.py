@@ -10,7 +10,7 @@ from models import (
     QueryRequest, QueryResponse, SystemStatus,
     BasicMatchRequest, PreciseMatchRequest, OneClickMatchResponse,
     PolicyEligibilityRequest, PolicyEligibilityResponse,
-    CompanyDevelopmentDataRequest, MajorEnterpriseDataRequest
+    CompanyDevelopmentDataRequest, MajorEnterpriseDataRequest, DevelopmentDataMatchResponse
 )
 from policy_matcher import policy_matcher
 
@@ -52,7 +52,9 @@ async def root():
             "natural_language_query": "支持自然语言政策查询",
             "basic_match": "支持三选项基础匹配",
             "precise_match": "支持基于企业信息的精准匹配",
-            "eligibility_analysis": "支持政策申请通过率自测分析"
+            "eligibility_analysis": "支持政策申请通过率自测分析",
+            "company_development_match": "支持普遍企业发展数据政策匹配",
+            "major_enterprise_match": "支持规上企业发展数据政策匹配"
         }
     }
 
@@ -175,6 +177,60 @@ async def precise_match(request: PreciseMatchRequest):
     except Exception as e:
         logger.error(f"精准匹配失败: {e}")
         raise HTTPException(status_code=500, detail=f"精准匹配失败: {str(e)}")
+
+
+# ======= 企业发展数据政策匹配接口 =======
+
+@app.post("/company-development-match", response_model=DevelopmentDataMatchResponse)
+async def company_development_data_match(request: CompanyDevelopmentDataRequest):
+    """
+    普遍企业发展数据政策匹配接口
+
+    Args:
+        request: 普遍企业发展数据请求
+
+    Returns:
+        企业发展数据政策匹配响应
+    """
+    try:
+        logger.info(f"收到普遍企业发展数据政策匹配请求: 企业={request.company_name}, 填报周期={request.report_period}")
+
+        # 执行企业发展数据政策匹配
+        policy_matcher = get_policy_matcher()
+        response = policy_matcher.company_development_match(request)
+
+        logger.info(f"普遍企业发展数据政策匹配完成，返回 {response.total_results} 个结果")
+        return response
+
+    except Exception as e:
+        logger.error(f"普遍企业发展数据政策匹配失败: {e}")
+        raise HTTPException(status_code=500, detail=f"匹配失败: {str(e)}")
+
+
+@app.post("/major-enterprise-match", response_model=DevelopmentDataMatchResponse)
+async def major_enterprise_data_match(request: MajorEnterpriseDataRequest):
+    """
+    规上企业发展数据政策匹配接口
+
+    Args:
+        request: 规上企业发展数据请求
+
+    Returns:
+        企业发展数据政策匹配响应
+    """
+    try:
+        logger.info(f"收到规上企业发展数据政策匹配请求: 企业={request.company_name}, 填报周期={request.report_period}")
+
+        # 执行规上企业发展数据政策匹配
+        policy_matcher = get_policy_matcher()
+        response = policy_matcher.major_enterprise_match(request)
+
+        logger.info(f"规上企业发展数据政策匹配完成，返回 {response.total_results} 个结果")
+        return response
+
+    except Exception as e:
+        logger.error(f"规上企业发展数据政策匹配失败: {e}")
+        raise HTTPException(status_code=500, detail=f"匹配失败: {str(e)}")
 
 def _calculate_development_match_score(self, policy: Dict, request, analysis: Dict, is_major: bool) -> float:
     """计算发展政策匹配分数"""

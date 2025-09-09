@@ -194,6 +194,68 @@ def test_api_endpoints():
     except Exception as e:
         logger.error(f"❌ 自然语言查询接口测试失败: {e}")
 
+    # 测试新增的企业发展数据政策匹配接口
+    try:
+        # 测试普遍企业发展数据匹配接口
+        test_data = {
+            "company_name": "测试科技有限公司",
+            "report_period": 202502,
+            "industrial_output": 0,
+            "total_income": 10000,
+            "tech_income": 2000,
+            "tax_payment": 1000,
+            "profit_total": 500,
+            "export_total": 0,
+            "rd_personnel_count": 5,
+            "rd_expense": 300,
+            "valid_patent_count": 3,
+            "valid_invention_patent_count": 1,
+            "employee_count": 50
+        }
+
+        response = requests.post(
+            f"{base_url}/company-development-match",
+            json=test_data,
+            headers={'Content-Type': 'application/json'}
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"✅ 普遍企业发展数据匹配接口正常，返回{result.get('total_results', 0)}个结果")
+        else:
+            logger.warning("⚠️  普遍企业发展数据匹配接口异常")
+    except Exception as e:
+        logger.error(f"❌ 普遍企业发展数据匹配接口测试失败: {e}")
+
+    try:
+        # 测试规上企业发展数据匹配接口
+        test_data = {
+            "company_name": "测试集团有限公司",
+            "report_period": 202502,
+            "total_income": 100000.0,
+            "industrial_output": 50000.0,
+            "tax_payment": 5000.0,
+            "profit_total": 10000.0,
+            "export_total": 8000.0,
+            "rd_expense": 3000.0,
+            "employee_count": 500,
+            "rd_personnel_count": 50
+        }
+
+        response = requests.post(
+            f"{base_url}/major-enterprise-match",
+            json=test_data,
+            headers={'Content-Type': 'application/json'}
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"✅ 规上企业发展数据匹配接口正常，返回{result.get('total_results', 0)}个结果")
+        else:
+            logger.warning("⚠️  规上企业发展数据匹配接口异常")
+    except Exception as e:
+        logger.error(f"❌ 规上企业发展数据匹配接口测试失败: {e}")
+
 def main():
     """主启动函数"""
     print("🚀 政策匹配系统 - 生产环境启动")
@@ -216,8 +278,10 @@ def main():
     print("  - API文档: http://localhost:8000/docs")
     print("  - 自然语言查询: ✅")
     print("  - 一键匹配功能: ✅")
+    print("  - 🆕 企业发展数据匹配: ✅")
     print("  - 智能查询理解: ✅")
     print("  - 企业信息分析: ✅")
+    print("  - 政策申请通过率自测: ✅")
     
     try:
         # 3. 启动服务
@@ -248,6 +312,11 @@ def main():
             print("  一键匹配:")
             print("    - 基础匹配: POST http://localhost:8000/basic-match")
             print("    - 精准匹配: POST http://localhost:8000/precise-match")
+            print("  🆕 企业发展数据匹配:")
+            print("    - 普遍企业匹配: POST http://localhost:8000/company-development-match")
+            print("    - 规上企业匹配: POST http://localhost:8000/major-enterprise-match")
+            print("  政策分析:")
+            print("    - 申请通过率自测: POST http://localhost:8000/analyze-eligibility")
             print("  系统管理:")
             print("    - 配置查询: GET http://localhost:8000/config")
             print("    - 健康检查: GET http://localhost:8000/health")
